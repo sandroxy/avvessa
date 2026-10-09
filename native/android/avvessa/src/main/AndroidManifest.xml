@@ -1,0 +1,36 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <application>
+        <!-- Runtime identity is supplied through JPushConfig; no host placeholder is required. -->
+        <meta-data android:name="JPUSH_APPKEY" android:value="" tools:replace="android:value" />
+        <meta-data android:name="JPUSH_CHANNEL" android:value="default" tools:replace="android:value" />
+        <provider android:name="cn.jpush.android.service.InitProvider" tools:node="remove" />
+        <provider android:name="com.sandrox.avvessa.AvvessaPrivacyProvider"
+            android:authorities="${applicationId}.avvessa.privacy"
+            android:exported="false" android:initOrder="1000" />
+        <provider android:name="com.sandrox.avvessa.AvvessaPushPrivacyProvider"
+            android:authorities="${applicationId}.avvessa.pushprivacy"
+            android:process=":pushcore" android:exported="false" android:initOrder="1000" />
+        <service android:name="com.sandrox.avvessa.AvvessaPushService"
+            android:process=":pushcore" android:exported="false">
+            <intent-filter><action android:name="cn.jiguang.user.service.action" /></intent-filter>
+        </service>
+        <receiver android:name="com.sandrox.avvessa.AvvessaReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="cn.jpush.android.intent.RECEIVE_MESSAGE" />
+                <category android:name="${applicationId}" />
+            </intent-filter>
+        </receiver>
+        <activity android:name="com.sandrox.avvessa.AvvessaNotificationActivity"
+            android:exported="false" android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+</manifest>

@@ -1,0 +1,26 @@
+apply plugin: "maven-publish"
+group = rootProject.ext.avvessaManifest.native.android.group
+version = rootProject.ext.avvessaManifest.version
+android.publishing { singleVariant("release") { withSourcesJar() } }
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                artifactId = project.name
+                pom {
+                    name = project.name
+                    description = "Framework-independent JPush integration for Android"
+                    url = "https://github.com/sandroxy/avvessa"
+                    licenses { license {
+                        name = "Apache License, Version 2.0"
+                        url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+                    } }
+                    developers { developer { id = "sandroxy"; name = "SandroX" } }
+                    scm { url = "https://github.com/sandroxy/avvessa.git" }
+                }
+            }
+        }
+        repositories { maven { url = rootProject.layout.buildDirectory.dir("maven") } }
+    }
+}

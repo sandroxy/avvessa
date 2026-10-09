@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "avvessa",
+  "displayName": "Avvessa",
+  "version": "0.1.0",
+  "repository": "https://github.com/sandroxy/avvessa.git",
+  "license": "Apache-2.0",
+  "native": {
+    "android": {
+      "group": "io.github.sandroxy",
+      "artifact": "avvessa",
+      "minimumSdk": 21,
+      "compileSdk": 36,
+      "jpush": "6.2.1",
+      "jcore": "5.5.7",
+      "vendorPlugin": "6.2.1"
+    },
+    "ios": {
+      "module": "Avvessa",
+      "minimumVersion": "13.0",
+      "jpush": "6.2.7",
+      "jcore": "5.5.3"
+    }
+  }
+}

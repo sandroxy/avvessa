@@ -1,0 +1,31 @@
+plugins {
+    id "com.android.library"
+}
+def metadata = rootProject.ext.avvessaManifest
+android {
+    namespace = "com.sandrox.avvessa"
+    compileSdk = metadata.native.android.compileSdk
+    defaultConfig {
+        minSdk = metadata.native.android.minimumSdk
+        consumerProguardFiles("consumer-rules.pro")
+        manifestPlaceholders = [JPUSH_APPKEY: "", JPUSH_CHANNEL: "default"]
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    // Storage tests use framework resources only and must not load SDK startup components.
+    testOptions { unitTests.includeAndroidResources = false }
+}
+dependencies {
+    api("cn.jiguang.sdk:jpush:${metadata.native.android.jpush}") {
+        exclude group: "cn.jiguang.sdk", module: "jcore"
+    }
+    api("cn.jiguang.sdk:jcore:${metadata.native.android.jcore}") {
+        version { strictly(metadata.native.android.jcore) }
+    }
+    implementation "androidx.core:core:1.13.1"
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.robolectric:robolectric:4.16.1"
+}
+apply from: rootProject.file("gradle/publishing.gradle")

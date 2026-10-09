@@ -1,0 +1,4 @@
+-keep class com.sandrox.avvessa.AvvessaReceiver { *; }
+-keep class com.sandrox.avvessa.AvvessaPushService { *; }
+-keep class com.sandrox.avvessa.AvvessaPrivacyProvider { *; }
+-keep class com.sandrox.avvessa.AvvessaPushPrivacyProvider { *; }

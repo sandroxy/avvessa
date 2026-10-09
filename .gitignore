@@ -1,0 +1,48 @@
+# Local operating-system and editor state
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.xcuserstate
+xcuserdata/
+
+# Dependencies, generated hosts, and build outputs
+node_modules/
+.gradle/
+.kotlin/
+.build/
+.swiftpm/
+build/
+dist/
+DerivedData/
+Pods/
+.expo/
+unpackage/
+coverage/
+.cache/
+
+# Machine-specific configuration and runtime evidence
+local.properties
+*.local.json
+*.local.xcconfig
+*.local.properties
+*.local.plist
+.env
+.env.*
+!.env.example
+*.log
+.artifacts/
+.acceptance-runs/
+.work/
+
+# Signing and service credentials
+*.jks
+*.keystore
+*.p12
+*.p8
+*.mobileprovision
+google-services.json
+agconnect-services.json
+
+# Private development notes and working records
+/doc/dev/

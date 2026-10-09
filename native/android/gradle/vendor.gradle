@@ -1,0 +1,19 @@
+apply plugin: "com.android.library"
+def metadata = rootProject.ext.avvessaManifest.native.android
+def vendor = project.name.substring("avvessa-".length())
+android {
+    namespace = "com.sandrox.avvessa.vendor." + vendor
+    compileSdk = metadata.compileSdk
+    defaultConfig { minSdk = metadata.minimumSdk }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+}
+dependencies {
+    api project(":avvessa")
+    api("cn.jiguang.sdk.plugin:${vendor}:${metadata.vendorPlugin}") {
+        version { strictly(metadata.vendorPlugin) }
+    }
+}
+apply from: rootProject.file("gradle/publishing.gradle")

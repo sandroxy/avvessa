@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <meta-data android:name="com.sandrox.avvessa.vendor.oppo" android:value="true" />
+        <!-- Incoming-call integration is an independent capability. -->
+        <service android:name="cn.jpush.android.service.OPCallkitPushMessageService" tools:node="remove" />
+    </application>
+</manifest>
