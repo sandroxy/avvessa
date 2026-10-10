@@ -1,0 +1,17 @@
+import { AvvessaTransport, AvvessaNativeCallback } from './interface.uts'
+
+// The exported JS command callback is one-shot. Multiplex native streams onto one keep-alive channel.
+let eventHandler: AvvessaNativeCallback | null = null
+export function setEventHandler(callback: AvvessaNativeCallback): void { eventHandler = callback }
+export function invokeForJavaScript(transport: AvvessaTransport, method: string, argsJSON: string, callback: AvvessaNativeCallback): void {
+  if (method != 'subscribe') { transport(method,argsJSON,callback); return }
+  const args = JSON.parseObject(argsJSON)
+  const id = args?.getString('subscriptionId')
+  if (id == null) { callback('{"ok":false,"error":{"code":"invalid_argument","message":"subscriptionId is required"}}'); return }
+  let answered = false
+  transport(method,argsJSON,(response: string) => {
+    if (!answered) { answered = true; callback(response); return }
+    const data = JSON.parseObject(response)?.getJSON('data')
+    eventHandler?.(JSON.stringify({subscriptionId:id!,response:response,closed:data?.getString('kind') == 'closed'})!)
+  })
+}

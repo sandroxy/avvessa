@@ -1,0 +1,6 @@
+{
+  "minSdkVersion": 21,
+  "dependencies": [
+    "androidx.core:core:1.13.1"
+  ]
+}

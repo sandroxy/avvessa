@@ -1,0 +1,29 @@
+// Resolve the packaged UNI dependency graph without changing the native core projects.
+gradle.projectsEvaluated {
+    rootProject.tasks.register('exportUniAppDependencies') {
+        doLast {
+            def names = ['avvessa'] + (rootProject.findProperty('avvessaVendors') ?: '').split(',').findAll { it }.collect { 'avvessa-' + it }
+            def records = [:]
+            def dependencies = names.collectMany { name ->
+                rootProject.project(':' + name).configurations.releaseRuntimeClasspath.allDependencies.findAll { it instanceof org.gradle.api.artifacts.ExternalModuleDependency }.collect { it.copy() }
+            }
+            def resolved = rootProject.configurations.detachedConfiguration(*dependencies)
+            // DCloud owns the runtime. Align split pre-1.8 stdlib artifacts with its Kotlin baseline.
+            def kotlinVersion = rootProject.ext.avvessaManifest.adapters.uniApp.kotlinVersion
+            resolved.resolutionStrategy.eachDependency { details ->
+                if (details.requested.group == 'org.jetbrains.kotlin') details.useVersion(kotlinVersion)
+            }
+            resolved.resolvedConfiguration.resolvedArtifacts.each { artifact ->
+                    if (!(artifact.id.componentIdentifier instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier)) {
+                        def id = artifact.moduleVersion.id
+                        def coordinate = "${id.group}:${id.name}:${id.version}"
+                        records[coordinate] = [coordinate: coordinate, file: artifact.file.absolutePath,
+                            bundled: !(id.group == 'cn.jiguang.sdk' || id.group.startsWith('androidx.') || id.group.startsWith('org.jetbrains') || id.group.startsWith('com.google'))]
+                    }
+            }
+            def destination = new File(rootProject.property('avvessaDependencyReport').toString())
+            destination.parentFile.mkdirs()
+            destination.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(records.values().sort { it.coordinate })) + '\n'
+        }
+    }
+}

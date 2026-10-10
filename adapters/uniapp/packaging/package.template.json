@@ -1,0 +1,69 @@
+{
+  "name": "Avvessa",
+  "id": "Sandrox-Avvessa",
+  "version": "@VERSION@",
+  "description": "General JPush integration for Android and iOS.",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/sandroxy/avvessa",
+  "_dp_type": "nativeplugin",
+  "_dp_nativeplugin": {
+    "android": {
+      "plugins": [
+        {
+          "type": "module",
+          "name": "Sandrox-Avvessa",
+          "class": "com.sandrox.avvessa.uniapp.AvvessaUniModule"
+        }
+      ],
+      "integrateType": "aar",
+      "dependencies": [],
+      "minSdkVersion": "21",
+      "compileOptions": {
+        "sourceCompatibility": "11",
+        "targetCompatibility": "11"
+      }
+    },
+    "ios": {
+      "plugins": [
+        {
+          "type": "module",
+          "name": "Sandrox-Avvessa",
+          "class": "AvvessaUniModule"
+        }
+      ],
+      "hooksClass": "AvvessaUniHook",
+      "integrateType": "framework",
+      "deploymentTarget": "13.0",
+      "frameworks": [
+        "Avvessa.framework",
+        "AvvessaBridge.framework",
+        "AvvessaUni.framework",
+        "UIKit.framework",
+        "UserNotifications.framework",
+        "Network.framework",
+        "Security.framework",
+        "CFNetwork.framework",
+        "SystemConfiguration.framework",
+        "libz.tbd",
+        "libresolv.tbd",
+        "Foundation.framework",
+        "CoreFoundation.framework",
+        "CoreTelephony.framework",
+        "CoreGraphics.framework",
+        "WebKit.framework"
+      ],
+      "resources": [
+        "AvvessaPrivacy.bundle"
+      ],
+      "validArchitectures": [
+        "arm64"
+      ],
+      "plists": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
+      },
+      "embedSwift": true
+    }
+  }
+}

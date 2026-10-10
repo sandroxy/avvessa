@@ -21,5 +21,24 @@
       "jpush": "6.2.7",
       "jcore": "5.5.3"
     }
+  },
+  "adapters": {
+    "uniApp": {
+      "id": "Sandrox-Avvessa",
+      "module": "Sandrox-Avvessa",
+      "kind": "nativeplugin",
+      "minimumHBuilderX": "5.24",
+      "kotlinVersion": "2.2.0"
+    },
+    "uniAppUts": {
+      "id": "Sandrox-Avvessa",
+      "kind": "uts",
+      "sourceRoot": "uni_modules/Sandrox-Avvessa",
+      "minimumHBuilderX": "5.24",
+      "runtimes": [
+        "uni-app",
+        "uni-app-x"
+      ]
+    }
   }
 }

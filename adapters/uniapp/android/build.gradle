@@ -1,0 +1,14 @@
+plugins { id "com.android.library" }
+android {
+    namespace "com.sandrox.avvessa.uniapp"
+    compileSdk 36
+    defaultConfig { minSdk 21; consumerProguardFiles "consumer-rules.pro" }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_11; targetCompatibility JavaVersion.VERSION_11 }
+}
+dependencies {
+    compileOnly files(providers.gradleProperty("avvessaCoreAar").get())
+    compileOnly project(":bridge")
+    compileOnly files(providers.gradleProperty("dcloudUniappAar").getOrElse("missing-dcloud-sdk.aar"))
+    compileOnly "com.alibaba:fastjson:1.2.83"
+    compileOnly "androidx.annotation:annotation:1.9.1"
+}

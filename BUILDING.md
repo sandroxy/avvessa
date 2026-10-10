@@ -47,3 +47,21 @@ python3 scripts/ios-privacy.py \
 The privacy checker expects the SDK versions declared in `plugin.json` and verifies both device and simulator declarations. After an intentional SDK update, review upstream declarations and run the same command without `--check` to regenerate the bundled union.
 
 Public files describe supported behavior and reproducible build procedures. Local machine configuration, generated consumers, SDK downloads, credentials and build evidence are excluded from Git.
+
+## UNI adapters
+
+The [UNI guide](adapters/uniapp/README.md) describes packaging, consumer resources and the separate legacy, classic UTS and uni-app x entry points. `scripts/package-uniapp.py` builds Android AARs and device iOS frameworks, resolves the selected vendor graph, and emits independent legacy/UTS ZIPs. The iOS framework builder also links an unsigned probe to catch missing SDK symbols and Swift runtime dependencies; it does not run that probe.
+
+After packaging, check the bridge contracts and a complete Android dependency merge:
+
+```sh
+node --test adapters/uniapp/tests/*.test.mjs
+native/android/gradlew -p adapters/android \
+  -PavvessaCoreAar="$PWD/native/android/avvessa/build/outputs/aar/avvessa-release.aar" \
+  :bridge:testDebugUnitTest
+python3 scripts/check-uniapp-android.py dist/uniapp/avvessa-uniapp-uts-0.1.0.zip
+```
+
+For a ZIP containing vendor transports, provide both `--configuration-aar` and `--consumer-manifest` from `prepare-uniapp-android.py`. A legacy ZIP additionally requires `--dcloud-android-aar`. The Android check links resources and bytecode and verifies the final manifest's consumer metadata, permission removals and disabled implicit JPush initialization. It creates an unsigned artifact without installing or running it.
+
+`scripts/check-uniapp-uts.py` compiles the packaged Android/iOS UTS transports against local classic and uni-app x SDKs. The separate integration repository also builds all three consumer frontends on both platforms and checks that persistent event callbacks survive DCloud's generated JS/native proxy. These checks do not prove notification delivery or lifecycle behavior on devices.

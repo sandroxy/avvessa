@@ -1,0 +1,1 @@
+-keep public class com.sandrox.avvessa.bridge.** { public *; }

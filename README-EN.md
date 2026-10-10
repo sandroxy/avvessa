@@ -4,7 +4,7 @@
 
 Avvessa provides native Android and iOS push APIs on top of the official Jiguang SDKs. Initialize with an AppKey, configure APNs or the required Android vendor channels, and consume notifications, custom messages, and notification interactions.
 
-The core has no React Native, Expo, or DCloud dependency. Authentication, account binding, navigation, and server-side sending belong to the application. RN, UNI, and incoming-call APIs are not provided.
+The core has no React Native, Expo, or DCloud dependency. Authentication, account binding, navigation, and server-side sending belong to the application. UNI adapters support legacy nativeplugins, classic UTS, and uni-app x. RN, Flutter, and incoming-call APIs are not provided.
 
 ## Native capabilities
 
@@ -24,6 +24,7 @@ Persistent connections, APNs, and vendor channels have different delivery condit
 | --- | --- | --- |
 | Android | Android 5.0 / API 21 | [Java / Kotlin guide](native/android/README.md), AAR and Maven metadata |
 | iOS | iOS 13 | [Swift / Objective-C guide](native/ios/README.md), Swift Package Manager or CocoaPods source integration |
+| UNI legacy / UTS / uni-app x | Native core and DCloud host requirements both apply | [Android/iOS integration and packaging](adapters/uniapp/README.md) |
 
 An AppKey does not replace platform setup. iOS requires APNs configuration and signing capabilities matching the Bundle ID. Android vendor channels require the corresponding vendor application settings. Never embed the server-side Master Secret in a client.
 

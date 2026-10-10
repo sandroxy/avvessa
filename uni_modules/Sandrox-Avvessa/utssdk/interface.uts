@@ -1,0 +1,3 @@
+export type AvvessaNativeCallback = (json: string) => void
+export type AvvessaTransport = (method: string, argumentsJSON: string, callback: AvvessaNativeCallback) => void
+export type AvvessaListener = (message: UTSJSONObject) => void

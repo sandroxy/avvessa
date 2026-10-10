@@ -1,0 +1,25 @@
+import { AvvessaNativeCallback, AvvessaTransport } from '../interface.uts'
+import { invokeForJavaScript, setEventHandler } from '../bridge.uts'
+import { AVBridgeSession, AVUniLifecycle } from 'AvvessaBridge'
+import { UIApplication } from 'UIKit'
+import { Data, NSError } from 'Foundation'
+const session = new AVBridgeSession()
+const transport: AvvessaTransport = function(method: string, args: string, callback: AvvessaNativeCallback): void {
+  session.invoke(method, argumentsJSON = args, completion = (json: string) => { callback(json) })
+}
+export class AvvessaAppHook implements UTSiOSHookProxy {
+  applicationDidFinishLaunchingWithOptions(application: UIApplication | null, launchOptions: Map<UIApplication.LaunchOptionsKey, any> | null = null): boolean {
+    AVUniLifecycle.shared.launch(launchOptions)
+    return true
+  }
+  didRegisterForRemoteNotifications(deviceToken: Data | null): void { if (deviceToken != null) AVUniLifecycle.shared.registerDeviceToken(deviceToken!) }
+  didFailToRegisterForRemoteNotifications(error: NSError | null): void { if (error != null) AVUniLifecycle.shared.registrationFailed(error!) }
+  didReceiveRemoteNotification(userInfo: Map<AnyHashable, any> | null): void { if (userInfo != null) AVUniLifecycle.shared.receive(userInfo!) }
+  applicationDidBecomeActive(application: UIApplication | null): void { AVUniLifecycle.shared.activate() }
+}
+
+export function invokeAvvessaNative(method: string, argumentsJSON: string, callback: AvvessaNativeCallback): void {
+  invokeForJavaScript(transport,method,argumentsJSON,callback)
+}
+@UTSJS.keepAlive
+export function onAvvessaNativeEvent(callback: AvvessaNativeCallback): void { setEventHandler(callback) }

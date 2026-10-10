@@ -1,0 +1,28 @@
+import { AvvessaNativeCallback, AvvessaTransport } from '../interface.uts'
+import { invokeForJavaScript, setEventHandler } from '../bridge.uts'
+import AvvessaBridge from 'com.sandrox.avvessa.bridge.AvvessaBridge'
+import AvvessaCallback from 'com.sandrox.avvessa.bridge.AvvessaCallback'
+class NativeCallback implements AvvessaCallback {
+  private callback: AvvessaNativeCallback
+  constructor(callback: AvvessaNativeCallback) { this.callback = callback }
+  override onResult(json: string): void { this.callback(json) }
+}
+let session: AvvessaBridge | null = null
+let hooksInstalled = false
+const transport: AvvessaTransport = function(method: string, args: string, callback: AvvessaNativeCallback): void {
+  const context = UTSAndroid.getAppContext()
+  if (context == null) { callback('{"ok":false,"error":{"code":"host_unavailable","message":"Application context is unavailable"}}'); return }
+  if (session == null) session = new AvvessaBridge(context!)
+  if (!hooksInstalled) {
+    hooksInstalled = true
+    UTSAndroid.onAppActivityDestroy(() => { session?.close(); session = null })
+    UTSAndroid.onAppActivityResume(() => { session?.refreshState() })
+  }
+  session!.invoke(UTSAndroid.getUniActivity(),method,args,new NativeCallback(callback))
+}
+
+export function invokeAvvessaNative(method: string, argumentsJSON: string, callback: AvvessaNativeCallback): void {
+  invokeForJavaScript(transport,method,argumentsJSON,callback)
+}
+@UTSJS.keepAlive
+export function onAvvessaNativeEvent(callback: AvvessaNativeCallback): void { setEventHandler(callback) }

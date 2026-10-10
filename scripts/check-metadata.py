@@ -19,7 +19,7 @@ for name in ("jpush", "jcore"):
     if pins[name + "-sdk"] != ios[name]:
         sys.exit(f"{name}: resolved package version differs")
 for filename in ("README.md", "README-EN.md", "BUILDING.md", "doc/architecture.md", "doc/contract.md",
-                 "native/android/README.md", "native/ios/README.md", "THIRD_PARTY_NOTICES.md"):
+                 "native/android/README.md", "native/ios/README.md", "THIRD_PARTY_NOTICES.md", "adapters/uniapp/README.md"):
     text = (root / filename).read_text()
     for target in re.findall(r"\]\(([^)]+)\)", text):
         if "://" in target or target.startswith("#"):
@@ -27,10 +27,16 @@ for filename in ("README.md", "README-EN.md", "BUILDING.md", "doc/architecture.m
         path = root / Path(filename).parent / target.split("#")[0]
         if not path.exists():
             sys.exit(f"{filename}: missing local link {target}")
+uni = json.loads((root / metadata['adapters']['uniAppUts']['sourceRoot'] / 'package.json').read_text())
+if uni['id'] != metadata['adapters']['uniAppUts']['id'] or uni['version'] != metadata['version']:
+    sys.exit('UNI package identity or version differs from plugin.json')
+legacy = json.loads((root / 'adapters/uniapp/packaging/package.template.json').read_text().replace('@VERSION@', metadata['version']))
+if legacy['id'] != metadata['adapters']['uniApp']['id'] or legacy['version'] != metadata['version']:
+    sys.exit('Legacy UNI package identity or version differs from plugin.json')
 result = subprocess.run(["git", "check-ignore", "--quiet", "doc/dev/"], cwd=root, check=False)
 if result.returncode != 0:
     sys.exit("Local development notes must remain ignored")
 tracked = subprocess.check_output(["git", "ls-files", "doc/dev"], cwd=root, text=True)
 if tracked:
     sys.exit("Development notes must not be tracked")
-print("Native dependency metadata, public links and development-note exclusion are consistent.")
+print("Native/UNI dependency metadata, public links and development-note exclusion are consistent.")

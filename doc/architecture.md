@@ -44,3 +44,9 @@ Android publishes AARs, source jars, POMs and Gradle module metadata to a local 
 The iOS resource manifest retains the combined declarations shipped with the pinned official SDKs. Resource packaging is necessary because their static-library XCFramework layout does not automatically copy those files into every consumer app.
 
 Host applications and delivery acceptance belong to a separate integration repository. Compile checks and isolated storage checks do not establish push delivery, APNs signing, device interaction or release eligibility.
+
+## UNI adapters
+
+The shared Android and iOS bridge validates JSON commands and owns observer lifetimes. The legacy DCloud module and UTS entry points forward to that bridge. Classic JavaScript uses one persistent event channel; uni-app x uses a UTS facade in the consumer runtime with the same single-channel subscription model. iOS application hooks capture APNs callbacks before page creation, allowing the core to persist cold-start interactions. No adapter acknowledges an event automatically.
+
+Public UNI packages contain only code and selected SDK dependencies. Application-specific vendor resources are assembled separately into a consumer AAR. This artifact belongs to the host and must not be included in a redistributed plugin package.

@@ -1,0 +1,22 @@
+{
+  "deploymentTarget": "13.0",
+  "identifier": "com.sandrox.avvessa.uniapp.uts",
+  "validArchitectures": [
+    "arm64"
+  ],
+  "frameworks": [
+    "UIKit.framework",
+    "UserNotifications.framework",
+    "Network.framework",
+    "Security.framework",
+    "CFNetwork.framework",
+    "SystemConfiguration.framework",
+    "libz.tbd",
+    "libresolv.tbd",
+    "Foundation.framework",
+    "CoreFoundation.framework",
+    "CoreTelephony.framework",
+    "CoreGraphics.framework",
+    "WebKit.framework"
+  ]
+}

@@ -1,0 +1,9 @@
+pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories { google(); mavenCentral() }
+}
+rootProject.name = "AvvessaAdapters"
+include(":bridge", ":uniapp")
+project(":bridge").projectDir = file("../shared/android")
+project(":uniapp").projectDir = file("../uniapp/android")

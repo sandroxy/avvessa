@@ -1,0 +1,88 @@
+{
+  "id": "Sandrox-Avvessa",
+  "displayName": "Avvessa 极光推送",
+  "version": "0.1.0",
+  "description": "基于官方极光原生 SDK 的通用推送，支持在线通知、厂商通道、通知配置与持久化事件。",
+  "keywords": [
+    "JPush",
+    "push",
+    "UTS",
+    "uni-app",
+    "uni-app-x"
+  ],
+  "repository": "https://github.com/sandroxy/avvessa",
+  "license": "Apache-2.0",
+  "engines": {
+    "HBuilderX": "^5.24",
+    "uni-app": "^5.24",
+    "uni-app-x": "^5.24"
+  },
+  "dcloudext": {
+    "type": "uts",
+    "sale": {
+      "regular": {
+        "price": "0.00"
+      },
+      "sourcecode": {
+        "price": "0.00"
+      }
+    },
+    "declaration": {
+      "ads": "无",
+      "data": "按宿主同意结果接入极光和选择的厂商推送 SDK，向相应服务商注册设备并接收消息；插件本地保存待消费事件，不向作者服务器发送数据。数据处理要求见各 SDK 的隐私说明。",
+      "permissions": "通知权限、网络访问及选择的厂商 SDK 必需权限；iOS APNs entitlement。"
+    },
+    "darkmode": "√",
+    "i18n": "x",
+    "widescreen": "x"
+  },
+  "uni_modules": {
+    "dependencies": [],
+    "encrypt": [],
+    "platforms": {
+      "cloud": {
+        "tcb": "x",
+        "aliyun": "x",
+        "alipay": "x"
+      },
+      "client": {
+        "uni-app": {
+          "vue": {
+            "vue2": "√",
+            "vue3": "√"
+          },
+          "web": {
+            "safari": "x",
+            "chrome": "x"
+          },
+          "app": {
+            "vue": "√",
+            "nvue": "x",
+            "android": {
+              "minVersion": "21"
+            },
+            "ios": {
+              "minVersion": "13"
+            },
+            "harmony": "x"
+          }
+        },
+        "uni-app-x": {
+          "web": {
+            "safari": "x",
+            "chrome": "x"
+          },
+          "app": {
+            "android": {
+              "minVersion": "23"
+            },
+            "ios": {
+              "minVersion": "15"
+            },
+            "harmony": "x"
+          }
+        }
+      }
+    }
+  }
+}

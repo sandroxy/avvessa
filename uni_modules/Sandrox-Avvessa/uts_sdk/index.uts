@@ -1,0 +1,57 @@
+import { invokeAvvessaNative, onAvvessaNativeEvent } from '@/uni_modules/Sandrox-Avvessa'
+import { AvvessaNativeCallback, AvvessaTransport, AvvessaListener } from '../utssdk/interface.uts'
+import { invokeObject, invokeVoid, invokeBoolean, pendingEvents, subscribeNative } from './client.uts'
+export { AvvessaError } from './client.uts'
+
+// This facade executes in the consumer runtime. Only one callback crosses the JS/native boundary.
+const streams = new Map<string, AvvessaNativeCallback>()
+let listening = false
+const transport: AvvessaTransport = function(method: string, json: string, callback: AvvessaNativeCallback): void {
+  if (method != 'subscribe') { invokeAvvessaNative(method,json,callback); return }
+  if (!listening) {
+    onAvvessaNativeEvent((packetJSON: string) => {
+      const packet = JSON.parseObject(packetJSON)!
+      const id = packet.getString('subscriptionId')!
+      const listener = streams.get(id)
+      if (packet.getBoolean('closed') == true) streams.delete(id)
+      listener?.(packet.getString('response')!)
+    })
+    listening = true
+  }
+  const id = JSON.parseObject(json)!.getString('subscriptionId')!
+  streams.set(id,callback)
+  try {
+    invokeAvvessaNative(method,json,(response: string) => {
+      if (JSON.parseObject(response)?.getBoolean('ok') != true) streams.delete(id)
+      callback(response)
+    })
+  } catch (error) { streams.delete(id); throw error }
+}
+
+export function subscribe(listener: AvvessaListener, options: UTSJSONObject = {}): Promise<string> { return subscribeNative(transport,listener,options) }
+export function unsubscribe(subscriptionId: string): Promise<void> { return invokeVoid(transport,'unsubscribe',{subscriptionId:subscriptionId}) }
+export function getPendingEvents(): Promise<UTSJSONObject[]> { return pendingEvents(transport) }
+export function acknowledge(eventId: string): Promise<boolean> { return invokeBoolean(transport,'acknowledge',{eventId:eventId}) }
+export function getState(): Promise<UTSJSONObject> { return invokeObject(transport,'getState') }
+export function getCapabilities(): Promise<UTSJSONObject> { return invokeObject(transport,'getCapabilities') }
+export function refreshState(): Promise<UTSJSONObject> { return invokeObject(transport,'refreshState') }
+export function requestNotificationPermission(): Promise<UTSJSONObject> { return invokeObject(transport,'requestNotificationPermission') }
+export function getAlias(): Promise<UTSJSONObject> { return invokeObject(transport,'getAlias') }
+export function deleteAlias(): Promise<UTSJSONObject> { return invokeObject(transport,'deleteAlias') }
+export function getTags(): Promise<UTSJSONObject> { return invokeObject(transport,'getTags') }
+export function clearTags(): Promise<UTSJSONObject> { return invokeObject(transport,'clearTags') }
+export function openNotificationSettings(): Promise<void> { return invokeVoid(transport,'openNotificationSettings') }
+export function clearPendingEvents(): Promise<void> { return invokeVoid(transport,'clearPendingEvents') }
+export function stopPush(): Promise<void> { return invokeVoid(transport,'stopPush') }
+export function resumePush(): Promise<void> { return invokeVoid(transport,'resumePush') }
+export function setConsentGranted(granted: boolean): Promise<void> { return invokeVoid(transport,'setConsentGranted',{granted:granted}) }
+export function setBadge(badge: number): Promise<void> { return invokeVoid(transport,'setBadge',{badge:badge}) }
+export function setAlias(alias: string): Promise<UTSJSONObject> { return invokeObject(transport,'setAlias',{alias:alias}) }
+export function checkTag(tag: string): Promise<UTSJSONObject> { return invokeObject(transport,'checkTag',{tag:tag}) }
+export function setTags(tags: string[]): Promise<UTSJSONObject> { return invokeObject(transport,'setTags',{tags:tags}) }
+export function addTags(tags: string[]): Promise<UTSJSONObject> { return invokeObject(transport,'addTags',{tags:tags}) }
+export function deleteTags(tags: string[]): Promise<UTSJSONObject> { return invokeObject(transport,'deleteTags',{tags:tags}) }
+export function setNotificationCategories(categories: UTSJSONObject[]): Promise<void> { return invokeVoid(transport,'setNotificationCategories',{categories:categories}) }
+export function initialize(options: UTSJSONObject): Promise<void> { return invokeVoid(transport,'initialize',options) }
+export function createNotificationChannel(options: UTSJSONObject): Promise<void> { return invokeVoid(transport,'createNotificationChannel',options) }
+export function clearNotifications(options: UTSJSONObject = {}): Promise<void> { return invokeVoid(transport,'clearNotifications',options) }

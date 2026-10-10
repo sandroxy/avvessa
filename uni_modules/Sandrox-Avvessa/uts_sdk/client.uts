@@ -1,0 +1,93 @@
+import { AvvessaTransport, AvvessaListener, AvvessaNativeCallback } from '../utssdk/interface.uts'
+
+export class AvvessaError {
+  name: string = 'AvvessaError'
+  code: string = 'invalid_response'
+  message: string = 'The push bridge failed'
+  nativeCode: number | null = null
+  nativeDomain: string | null = null
+  constructor(payload: UTSJSONObject) {
+    this.code = payload.getString('code') ?? 'invalid_response'
+    this.message = payload.getString('message') ?? 'The push bridge failed'
+    this.nativeCode = payload.getNumber('nativeCode')
+    this.nativeDomain = payload.getString('nativeDomain')
+  }
+}
+export function invalidResponse(): AvvessaError {
+  return new AvvessaError({code: 'invalid_response', message: 'Native bridge returned an invalid response'})
+}
+export function invoke(transport: AvvessaTransport, method: string, args: UTSJSONObject = {}): Promise<UTSJSONObject> {
+  return new Promise<UTSJSONObject>((resolve, reject) => {
+    const json = JSON.stringify(args)
+    if (json == null) { reject(new AvvessaError({code:'invalid_argument',message:'Arguments must be JSON values'})); return }
+    transport(method, json!, (response: string) => {
+      const envelope = JSON.parseObject(response)
+      if (envelope == null) { reject(invalidResponse()); return }
+      if (envelope!.getBoolean('ok') == true) resolve(envelope!)
+      else reject(new AvvessaError(envelope!.getJSON('error') ?? {}))
+    })
+  })
+}
+export function invokeObject(transport: AvvessaTransport, method: string, args: UTSJSONObject = {}): Promise<UTSJSONObject> {
+  return invoke(transport, method, args).then((envelope: UTSJSONObject): Promise<UTSJSONObject> => {
+    return new Promise<UTSJSONObject>((resolve, reject) => {
+      const data = envelope.getJSON('data')
+      if (data == null) reject(invalidResponse())
+      else resolve(data!)
+    })
+  })
+}
+export function invokeVoid(transport: AvvessaTransport, method: string, args: UTSJSONObject = {}): Promise<void> {
+  return invoke(transport, method, args).then((_envelope: UTSJSONObject): void => {})
+}
+export function invokeBoolean(transport: AvvessaTransport, method: string, args: UTSJSONObject): Promise<boolean> {
+  return invoke(transport, method, args).then((envelope: UTSJSONObject): Promise<boolean> => {
+    return new Promise<boolean>((resolve, reject) => {
+      const data = envelope.getBoolean('data')
+      if (data == null) reject(invalidResponse())
+      else resolve(data!)
+    })
+  })
+}
+export function pendingEvents(transport: AvvessaTransport): Promise<UTSJSONObject[]> {
+  return invoke(transport, 'getPendingEvents').then((envelope: UTSJSONObject): Promise<UTSJSONObject[]> => {
+    return new Promise<UTSJSONObject[]>((resolve, reject) => {
+      const values = JSON.parseArray<UTSJSONObject>(JSON.stringify(envelope['data']) ?? '')
+      if (values == null) reject(invalidResponse())
+      else resolve(values!)
+    })
+  })
+}
+let sequence: number = 0
+export function subscribeNative(transport: AvvessaTransport, listener: AvvessaListener, options: UTSJSONObject): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const keys = UTSJSONObject.keys(options)
+    if (keys.some((key: string): boolean => key != 'replayPending')) { reject(new AvvessaError({code:'invalid_argument',message:'Only replayPending is supported'})); return }
+    let replay = true
+    if (keys.indexOf('replayPending') >= 0) {
+      const configured = options.getBoolean('replayPending')
+      if (configured == null) { reject(new AvvessaError({code:'invalid_argument',message:'replayPending must be a boolean'})); return }
+      replay = configured!
+    }
+    sequence += 1
+    const id = 'uts:' + Date.now().toString() + ':' + sequence.toString()
+    let registered = false
+    transport('subscribe', JSON.stringify({subscriptionId:id,replayPending:replay})!, (json: string) => {
+      const envelope = JSON.parseObject(json)
+      if (envelope == null || envelope!.getBoolean('ok') != true) {
+        const error = new AvvessaError(envelope?.getJSON('error') ?? {})
+        if (!registered) reject(error)
+        else listener({kind:'error',error:{code:error.code,message:error.message,nativeCode:error.nativeCode,nativeDomain:error.nativeDomain}})
+        return
+      }
+      const data = envelope!.getJSON('data')
+      if (data == null) { if (!registered) reject(invalidResponse()); return }
+      if (!registered) {
+        if (data!.getString('kind') != 'subscribed' || data!.getString('subscriptionId') != id) { reject(invalidResponse()); return }
+        registered = true; resolve(id); return
+      }
+      if (data!.getString('kind') != 'closed') listener(data!)
+    })
+  })
+}
+
