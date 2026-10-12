@@ -14,7 +14,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    // Storage tests use framework resources only and must not load SDK startup components.
+    // Unit tests use framework resources only and must not load SDK startup components.
     testOptions { unitTests.includeAndroidResources = false }
 }
 dependencies {

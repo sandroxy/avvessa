@@ -55,6 +55,8 @@ On subsequent application launches, read `push.getState().consentGranted` and in
 
 Configuration defaults: channel `default`, notification channel `avvessa` / `Notifications`, a white bell small icon, foreground presentation enabled, opening the launcher on click enabled, SDK debug logging disabled. `openApplicationOnClick(false)` records clicks without requesting launcher navigation.
 
+Opening the application restores its existing launcher task without clearing its pages. If no such task exists, Avvessa starts the application's declared launcher. This supports hosts whose launcher forwards to another Activity, including notification clicks that JPush has already used to start the host. Server-defined notification destinations are handled by JPush independently of Avvessa's launcher option.
+
 The SDK's auto-init provider is removed. Private providers restore saved consent in both the primary and `:pushcore` processes; they do not replace explicit initialization. Keep those providers, the SDK process name and Avvessa's receiver/service intact.
 
 ## Observe and acknowledge

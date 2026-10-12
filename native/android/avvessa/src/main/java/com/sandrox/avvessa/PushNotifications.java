@@ -55,6 +55,21 @@ final class PushNotifications {
     static void openApplication(Context context) {
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         if (intent == null) throw new PushException("host_unavailable", "The application has no launcher Activity");
-        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+        ActivityManager manager = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.AppTask task : manager.getAppTasks()) {
+            try {
+                // JPush can open the host before delivering the click callback. Restore that
+                // task without relaunching a transient launcher or removing its destination.
+                if (intent.getComponent().equals(task.getTaskInfo().baseIntent.getComponent())) {
+                    task.moveToFront();
+                    return;
+                }
+            } catch (IllegalArgumentException removedTask) {
+                // A task can disappear between enumeration and the platform operation.
+            }
+        }
+        // A launcher may forward to another Activity. CLEAR_TOP/SINGLE_TOP can destroy
+        // that page and reuse the launcher while it is already finishing.
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
 }
