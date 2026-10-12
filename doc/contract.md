@@ -76,6 +76,8 @@ Revoking consent clears pending events and RegistrationID and cancels pending SD
 
 Android's local small icon and foreground policy apply to notifications constructed inside the app. Factory-managed system notifications may use manufacturer resources, categories and cloud settings. Android channel importance and sound are controlled by the system after channel creation; recreating the same ID does not reset the user's settings.
 
+The Android core includes a default `jpush_notification_icon` resource for the SDK's initial notification construction, including hosts without an application icon. The configured `smallIcon` is then applied by Avvessa's notification builder. A host can override the default drawable resource.
+
 iOS only records a background receive event when iOS actually calls the app. Ordinary APNs alerts can be displayed without waking application code. A subsequent click can therefore appear without a preceding receive event in the queue. Silent notifications and force-stopped applications have platform restrictions.
 
 A payload or deep link never authorizes login, navigation or another business action. The application interprets it after any necessary authentication.

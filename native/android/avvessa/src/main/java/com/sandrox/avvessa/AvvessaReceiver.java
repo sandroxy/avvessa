@@ -60,6 +60,9 @@ public final class AvvessaReceiver extends JPushMessageReceiver {
     @Override public void onRegister(Context context, String id) { Avvessa.getInstance(context).registrationChanged(id); }
     @Override public void onConnected(Context context, boolean connected) { Avvessa.getInstance(context).stateChanged(); }
     @Override public void onCommandResult(Context context, CmdMessage message) {
+        // getConnectionState reports 0/1 as connected/disconnected, not success/failure.
+        // onConnected delivers transitions; querying again here would repeat this callback.
+        if (message.cmd == 2004 && (message.errorCode == 0 || message.errorCode == 1)) return;
         if (message.errorCode != 0) Avvessa.getInstance(context).report(new PushException(
                 "sdk_error", "JPush command " + message.cmd + " failed", message.errorCode, null));
     }

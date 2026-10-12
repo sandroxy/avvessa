@@ -1,0 +1,4 @@
+<resources>
+    <!-- JPush resolves its default icon before calling the custom notification builder. -->
+    <item name="jpush_notification_icon" type="drawable">@drawable/avvessa_notification</item>
+</resources>
