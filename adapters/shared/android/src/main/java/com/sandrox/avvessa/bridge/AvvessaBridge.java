@@ -4,6 +4,10 @@ import android.app.Activity;
 import android.app.NotificationChannel;
 import android.content.Context;
 import android.graphics.Color;
+import android.media.AudioAttributes;
+import android.net.Uri;
+import com.sandrox.avvessa.NotificationPolicy;
+import com.sandrox.avvessa.NotificationLifecycle;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
@@ -66,6 +70,8 @@ public final class AvvessaBridge {
             case "unsubscribe": fields(args, "subscriptionId"); remove(string(args, "subscriptionId")); break;
             case "stopPush": fields(args); client.stopPush(); break;
             case "resumePush": fields(args); client.resumePush(); break;
+            case "setActiveNotificationContext": fields(args, "id", "category"); client.setActiveNotificationContext(args); break;
+            case "clearActiveNotificationContext": fields(args); client.clearActiveNotificationContext(); break;
             case "setBadge":
                 fields(args, "badge"); if (!args.has("badge")) throw invalid("badge is required");
                 client.setBadge((int) integer(args, "badge", 0, 0, Integer.MAX_VALUE)); break;
@@ -77,7 +83,7 @@ public final class AvvessaBridge {
                 else {
                     JSONArray ids = array(args, "androidIds");
                     ArrayList<Integer> valid = new ArrayList<>();
-                    for (int i = 0; i < ids.length(); i++) valid.add((int) integer(json("id", ids.opt(i)), "id", 0, 0, Integer.MAX_VALUE));
+                    for (int i = 0; i < ids.length(); i++) valid.add((int) integer(json("id", ids.opt(i)), "id", 0, Integer.MIN_VALUE, Integer.MAX_VALUE));
                     for (int id : valid) client.clearNotification(id);
                 }
                 break;
@@ -99,7 +105,7 @@ public final class AvvessaBridge {
 
     @android.annotation.SuppressLint("DiscouragedApi")
     private PushConfiguration configuration(JSONObject args) {
-        fields(args, "appKey", "channel", "debug", "maxPendingEvents", "eventRetentionMilliseconds", "android", "ios");
+        fields(args, "appKey", "channel", "debug", "maxPendingEvents", "eventRetentionMilliseconds", "android", "ios", "presentationPolicy", "notificationLifecycle");
         JSONObject android = object(args, "android"), ios = object(args, "ios");
         fields(android, "smallIcon", "color", "notificationChannelId", "notificationChannelName", "presentInForeground", "openApplicationOnClick");
         fields(ios, "apnsEnvironment", "foregroundPresentation");
@@ -108,6 +114,8 @@ public final class AvvessaBridge {
         if (ios.has("foregroundPresentation")) for (String option : strings(ios, "foregroundPresentation", true))
             if (!java.util.Arrays.asList("banner", "list", "sound", "badge").contains(option)) throw invalid("Invalid foreground presentation option");
         PushConfiguration.Builder builder = new PushConfiguration.Builder(string(args, "appKey"))
+            .presentationPolicy(new NotificationPolicy(object(args, "presentationPolicy")))
+            .notificationLifecycle(new NotificationLifecycle(object(args, "notificationLifecycle")))
             .channel(string(args, "channel", "default")).debug(bool(args, "debug", false))
             .notificationChannel(string(android, "notificationChannelId", "avvessa"), string(android, "notificationChannelName", "Notifications"))
             .presentInForeground(bool(android, "presentInForeground", true)).openApplicationOnClick(bool(android, "openApplicationOnClick", true))
@@ -128,12 +136,35 @@ public final class AvvessaBridge {
     }
 
     private void createChannel(Avvessa client, JSONObject args) {
-        fields(args, "id", "name", "importance", "description", "sound", "vibration", "showBadge");
+        fields(args, "id", "name", "importance", "description", "sound", "soundUri", "vibration", "vibrationPattern", "lights", "lightColor", "showBadge");
         if (Build.VERSION.SDK_INT < 26) throw new PushException("unsupported", "Notification channels require Android 8 or later");
-        NotificationChannel channel = new NotificationChannel(string(args, "id"), string(args, "name"), (int) integer(args, "importance", 3, 0, 5));
+        NotificationChannel channel = new NotificationChannel(string(args, "id"), string(args, "name"), (int) integer(args, "importance", 4, 0, 5));
         if (args.has("description")) channel.setDescription(string(args, "description"));
         if (!bool(args, "sound", true)) channel.setSound(null, null);
+        if (args.has("soundUri")) {
+            if (!bool(args, "sound", true)) throw invalid("soundUri cannot be combined with sound=false");
+            Uri uri = Uri.parse(string(args, "soundUri"));
+            if (!java.util.Arrays.asList("content", "android.resource").contains(uri.getScheme()) || uri.getAuthority() == null)
+                throw invalid("soundUri must be a content:// or android.resource:// URI");
+            channel.setSound(uri, new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION).build());
+        }
+        if (args.has("vibrationPattern")) {
+            if (!bool(args, "vibration", true)) throw invalid("vibrationPattern cannot be combined with vibration=false");
+            JSONArray values = array(args, "vibrationPattern");
+            if (values.length() == 0 || values.length() > 32) throw invalid("vibrationPattern must have 1 to 32 durations");
+            long[] pattern = new long[values.length()]; long total = 0;
+            for (int i = 0; i < pattern.length; i++) { pattern[i] = integer(json("duration", values.opt(i)), "duration", 0, 0, 60000); total += pattern[i]; }
+            if (total == 0 || total > 60000) throw invalid("vibrationPattern total must be between 1 and 60000 milliseconds");
+            channel.setVibrationPattern(pattern);
+        }
         channel.enableVibration(bool(args, "vibration", true)); channel.setShowBadge(bool(args, "showBadge", true));
+        channel.enableLights(bool(args, "lights", args.has("lightColor")));
+        if (args.has("lightColor")) {
+            if (!bool(args, "lights", true)) throw invalid("lightColor cannot be combined with lights=false");
+            String value = string(args, "lightColor");
+            if (!value.matches("#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?")) throw invalid("lightColor must be #RRGGBB or #AARRGGBB");
+            channel.setLightColor(Color.parseColor(value));
+        }
         client.createNotificationChannel(channel);
     }
 

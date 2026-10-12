@@ -42,11 +42,34 @@ int main(void) {
         store = [[AVEventStore alloc] initWithDirectory:directory error:&error];
         check(![store.state[@"consent"] boolValue] && !store.state[@"registrationId"] && [store pending:config error:&error].count == 0,
               @"Revocation is persisted together with event and identity removal");
+        NSMutableDictionary *receipt = [event(@"alias-one", @"notificationReceived", now) mutableCopy];
+        receipt[@"messageId"] = NSNull.null;
+        check([store append:receipt deduplicationKeys:@[@"request"] messageID:nil configuration:config error:&error] != nil,
+              @"Request identity can precede SDK message identity");
+        receipt[@"messageId"] = @"message-one";
+        check(![store append:receipt deduplicationKeys:@[@"request",@"message-one"] messageID:@"message-one" configuration:config error:&error] && !error,
+              @"Later SDK identity joins the request without a second receipt");
+        store = [[AVEventStore alloc] initWithDirectory:directory error:&error];
+        check(![store append:receipt deduplicationKeys:@[@"message-one"] messageID:@"message-one" configuration:config error:&error] && !error,
+              @"Joined identities survive reopening and callbacks without request identity");
+        receipt[@"id"] = @"alias-two"; receipt[@"messageId"] = @"message-two";
+        check([store append:receipt deduplicationKeys:@[@"request",@"message-two"] messageID:@"message-two" configuration:config error:&error] != nil,
+              @"A request identifier reused by a different known message remains a new receipt");
+        [store clearWithError:&error];
+        check(![store append:receipt deduplicationKeys:@[@"message-two"] messageID:@"message-two" configuration:config error:&error] && !error,
+              @"Clearing pending work retains short-lived duplicate suppression");
+        NSURL *file = [directory URLByAppendingPathComponent:@"events.json"];
+        NSDictionary *legacy = @{@"schema":@1,@"state":@{@"consent":@YES},@"events":@[receipt],@"dedup":@{@"old":@(now+60000)},@"dropped":@0};
+        [[NSJSONSerialization dataWithJSONObject:legacy options:0 error:&error] writeToURL:file atomically:YES];
+        store = [[AVEventStore alloc] initWithDirectory:directory error:&error];
+        check(store && [store.state[@"consent"] boolValue] && [store pending:config error:&error].count == 1,
+              @"Storage upgrade preserves consent and pending work");
+        check(![store append:receipt deduplicationKey:@"old" configuration:config error:&error] && !error,
+              @"Storage upgrade preserves existing suppression keys");
         NSDictionary *invalid = @{@"id": @"bad", @"raw": NSData.data};
         check(![store append:invalid deduplicationKey:nil configuration:config error:&error]
               && [error.userInfo[AVPushErrorCodeKey] isEqual:@"invalid_data"], @"Non-JSON payload is rejected explicitly");
         error = nil;
-        NSURL *file = [directory URLByAppendingPathComponent:@"events.json"];
         NSData *corrupt = [NSJSONSerialization dataWithJSONObject:@{@"schema": @1, @"state": @{}, @"events": @[@"invalid"], @"dedup": @{}, @"dropped": @0} options:0 error:&error];
         [corrupt writeToURL:file options:NSDataWritingAtomic error:&error];
         check(![[AVEventStore alloc] initWithDirectory:directory error:&error]

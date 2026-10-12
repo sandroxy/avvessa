@@ -50,10 +50,12 @@ def check(args):
     lines += ['}']
     write('app/build.gradle','\n'.join(lines)+'\n')
     expected_metadata = {}
+    retained_permissions = set()
     if args.consumer_manifest:
         manifest = ET.parse(args.consumer_manifest).getroot()
         manifest.attrib.pop('package', None)
-        expected_metadata = {entry.get(f'{{{ANDROID}}}name'): entry.get(f'{{{ANDROID}}}value')
+        retained_permissions = {p.get(f'{{{ANDROID}}}name') for p in manifest.findall('uses-permission') if p.get('{http://schemas.android.com/tools}node') == 'merge'}
+        expected_metadata = {entry.get(f'{{{ANDROID}}}name'): entry.get(f'{{{ANDROID}}}value',entry.get(f'{{{ANDROID}}}resource'))
                              for entry in manifest.findall('application/meta-data')}
         write('app/src/main/AndroidManifest.xml',ET.tostring(manifest,encoding='unicode'))
     else:
@@ -63,7 +65,7 @@ def check(args):
         result=subprocess.run([str(ROOT/'native/android/gradlew'),'-p',str(output),':app:assembleRelease','--console=plain'],cwd=ROOT,stdout=stream,stderr=subprocess.STDOUT)
     if result.returncode: raise SystemExit(f'Android package linkage failed; inspect {log}')
     merged = ET.parse(app/'build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml').getroot()
-    actual_metadata = {entry.get(f'{{{ANDROID}}}name'): entry.get(f'{{{ANDROID}}}value')
+    actual_metadata = {entry.get(f'{{{ANDROID}}}name'): entry.get(f'{{{ANDROID}}}value',entry.get(f'{{{ANDROID}}}resource'))
                        for entry in merged.findall('application/meta-data')}
     if any(actual_metadata.get(key) != value for key,value in expected_metadata.items()):
         raise SystemExit('The packaged application did not preserve consumer metadata overrides')
@@ -71,7 +73,9 @@ def check(args):
         raise SystemExit('The packaged application retained implicit JPush initialization')
     removed = {entry.get(f'{{{ANDROID}}}name') for entry in ET.parse(ROOT/'native/android/avvessa/src/main/AndroidManifest.xml').getroot().findall('uses-permission')
                if entry.get('{http://schemas.android.com/tools}node') == 'remove'}
-    if removed.intersection(entry.get(f'{{{ANDROID}}}name') for entry in merged.findall('uses-permission')):
+    final_permissions = {entry.get(f'{{{ANDROID}}}name') for entry in merged.findall('uses-permission')}
+    if not retained_permissions <= final_permissions: raise SystemExit('A permission explicitly retained by the host was removed')
+    if (removed-retained_permissions).intersection(final_permissions):
         raise SystemExit('The packaged application retained permissions removed by Avvessa')
     print('Android package resources, manifest, privacy merge rules and bytecode linked. This artifact is not a runnable delivery test.')
 

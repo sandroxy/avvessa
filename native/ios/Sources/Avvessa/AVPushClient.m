@@ -18,6 +18,9 @@
     NSInteger _sequence;
     NSUInteger _consentGeneration;
     NSDictionary *_lastError;
+    NSDictionary *_activeNotificationContext;
+    BOOL _enteredBackground;
+    BOOL _pendingOpenCleanup;
 }
 
 + (AVPushClient *)sharedClient {
@@ -37,6 +40,10 @@
         NSDictionary *saved = _store.state[@"configuration"];
         if (saved) _configuration = [AVPushConfiguration fromDictionary:saved error:&storageError];
         _storageError = storageError;
+        __weak AVPushClient *weakSelf = self;
+        _notificationDelegate = [[AVNotificationDelegate alloc] initWithPrimary:self owns:^BOOL(NSDictionary *payload) {
+            return [weakSelf canHandleRemoteNotification:payload];
+        } failure:^(NSError *error) { [weakSelf report:error]; }];
         [JGInforCollectionAuth JCollectionAuth:^(JGInforCollectionAuthItems *items) { items.isAuth = [self consent]; }];
     }
     return self;
@@ -64,7 +71,7 @@
 }
 - (NSDictionary *)capabilities {
     return @{@"platform": @"ios", @"apns": @YES, @"durableEvents": @YES,
-             @"notificationCategories": @YES, @"incomingCalls": @NO};
+             @"notificationCategories": @YES, @"presentationPolicy": @YES, @"notificationLifecycle": @YES, @"incomingCalls": @NO};
 }
 - (BOOL)setConsentGranted:(BOOL)granted error:(NSError **)error {
     AVRequireMainThread();
@@ -73,7 +80,7 @@
         if (![_store setStateValue:@YES forKey:@"consent" error:error]) return NO;
     } else {
         if (![_store revokeConsentWithError:error]) return NO;
-        _consentGeneration++;
+        _consentGeneration++; _activeNotificationContext = nil; _pendingOpenCleanup = NO;
         if (_initialized) [JPUSHService turnOffPush:^(NSInteger code) {
             if (code != 0) [self report:AVError(@"sdk_error", @"SDK could not confirm push shutdown", @(code), nil)];
         }];
@@ -113,6 +120,9 @@
     [JPUSHService setupWithOption:launchOptions appKey:configuration.appKey channel:configuration.channel
                 apsForProduction:configuration.production advertisingIdentifier:nil];
     _initialized = YES;
+    [self cleanupBadge:_pendingOpenCleanup || [_configuration.notificationLifecycle.dictionary[@"clearBadgeOnStart"] boolValue]
+            delivered:[_configuration.notificationLifecycle.dictionary[@"clearDeliveredOnStart"] boolValue]];
+    _pendingOpenCleanup = NO;
     [JPUSHService registrationIDCompletionHandler:^(int code, NSString *registration) {
         dispatch_async(dispatch_get_main_queue(), ^{
             if (![self consent]) return;
@@ -138,6 +148,18 @@
     NSArray *names = @[kJPFNetworkDidLoginNotification, kJPFNetworkDidCloseNotification,
                        kJPFNetworkDidRegisterNotification, kJPFNetworkFailedRegisterNotification,
                        kJPFNetworkDidReceiveMessageNotification, kJPFServiceErrorNotification];
+    __weak AVPushClient *weakClient = self;
+    [_notificationTokens addObject:[center addObserverForName:UIApplicationDidEnterBackgroundNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        AVPushClient *client = weakClient; if (client) client->_enteredBackground = YES;
+    }]];
+    [_notificationTokens addObject:[center addObserverForName:UIApplicationDidBecomeActiveNotification object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) {
+        AVPushClient *client = weakClient; if (!client) return;
+        if (client->_enteredBackground && [client consent]) {
+            [client cleanupBadge:[client->_configuration.notificationLifecycle.dictionary[@"clearBadgeOnForeground"] boolValue]
+                       delivered:[client->_configuration.notificationLifecycle.dictionary[@"clearDeliveredOnForeground"] boolValue]];
+        }
+        client->_enteredBackground = NO; [client refreshNotificationSettings];
+    }]];
     for (NSString *name in names) {
         __weak AVPushClient *weakSelf = self;
         id token = [center addObserverForName:name object:nil queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *notification) {
@@ -209,17 +231,28 @@
 }
 - (void)record:(NSString *)type messageID:(NSString *)messageID transportID:(NSString *)transportID
         source:(NSString *)source data:(NSDictionary *)data raw:(NSDictionary *)raw title:(NSString *)title body:(NSString *)body action:(NSDictionary *)action {
+    [self record:type messageID:messageID transportID:transportID source:source data:data raw:raw title:title body:body action:action presentation:nil];
+}
+- (void)record:(NSString *)type messageID:(NSString *)messageID transportID:(NSString *)transportID
+        source:(NSString *)source data:(NSDictionary *)data raw:(NSDictionary *)raw title:(NSString *)title body:(NSString *)body action:(NSDictionary *)action presentation:(NSDictionary *)presentation {
     if (![self consent] || !_configuration) return;
     NSDictionary *record = @{@"id": NSUUID.UUID.UUIDString, @"type": type, @"messageId": messageID ?: NSNull.null,
         @"transportId": transportID ?: NSNull.null, @"source": source, @"platform": @"ios",
         @"receivedAt": @(NSDate.date.timeIntervalSince1970 * 1000), @"data": data ?: NSNull.null, @"raw": raw,
-        @"title": title ?: NSNull.null, @"body": body ?: NSNull.null, @"action": action ?: NSNull.null};
-    NSString *identity = messageID.length ? [@"message:" stringByAppendingString:messageID]
-        : (transportID.length ? [@"request:" stringByAppendingString:transportID] : nil);
-    NSString *key = identity ? [NSString stringWithFormat:@"%@\n%@\n%@\n%@", type, source, identity, action[@"identifier"] ?: @""] : nil;
+        @"title": title ?: NSNull.null, @"body": body ?: NSNull.null, @"action": action ?: NSNull.null, @"presentation": presentation ?: NSNull.null};
+    NSMutableArray *keys = [NSMutableArray array];
+    NSArray *phase = @[type, action[@"identifier"] ?: @""];
+    for (NSArray *identity in @[@[@"message",messageID ?: @""], @[@"request",transportID ?: @""]]) {
+        if (![identity[1] length]) continue;
+        NSData *encoded = [NSJSONSerialization dataWithJSONObject:[phase arrayByAddingObjectsFromArray:identity] options:0 error:nil];
+        [keys addObject:[[NSString alloc] initWithData:encoded encoding:NSUTF8StringEncoding]];
+    }
     NSError *error;
-    AVPushEvent *event = [_store append:record deduplicationKey:key configuration:_configuration error:&error];
+    AVPushEvent *event = [_store append:record deduplicationKeys:keys messageID:messageID configuration:_configuration error:&error];
     if (error) { [self report:AVError(@"storage_write", @"Could not persist push event", nil, error)]; return; }
+    if (event && [type isEqual:@"notificationOpened"] && [_configuration.notificationLifecycle.dictionary[@"clearBadgeOnOpen"] boolValue]) {
+        if (_initialized) [self cleanupBadge:YES delivered:NO]; else _pendingOpenCleanup = YES;
+    }
     if (event) for (NSUUID *identifier in [_observers.allKeys copy]) [self deliver:event to:identifier];
 }
 - (void)deliver:(AVPushEvent *)event to:(NSUUID *)identifier {
@@ -297,6 +330,9 @@
     return ([identifier isKindOfClass:NSString.class] && [identifier length] > 0) || [identifier isKindOfClass:NSNumber.class];
 }
 - (void)recordRemote:(NSDictionary *)userInfo type:(NSString *)type requestID:(NSString *)requestID action:(NSDictionary *)action {
+    [self recordRemote:userInfo type:type requestID:requestID action:action presentation:nil];
+}
+- (void)recordRemote:(NSDictionary *)userInfo type:(NSString *)type requestID:(NSString *)requestID action:(NSDictionary *)action presentation:(NSDictionary *)presentation {
     if (![self consent] || ![self canHandleRemoteNotification:userInfo]) return;
     id identifier = userInfo[@"_j_msgid"];
     NSString *messageID = [identifier isKindOfClass:NSString.class] ? identifier
@@ -309,7 +345,7 @@
         if ([alert[@"body"] isKindOfClass:NSString.class]) body = alert[@"body"];
     }
     NSMutableDictionary *data = [userInfo mutableCopy]; [data removeObjectForKey:@"aps"]; [data removeObjectForKey:@"_j_msgid"];
-    [self record:type messageID:messageID transportID:requestID source:@"apns" data:data raw:userInfo title:title body:body action:action];
+    [self record:type messageID:messageID transportID:requestID source:@"apns" data:data raw:userInfo title:title body:body action:action presentation:presentation];
     if (_initialized && messageID.length) [JPUSHService handleRemoteNotification:userInfo];
 }
 - (void)handleRemoteNotification:(NSDictionary *)userInfo { AVRequireMainThread(); [self recordRemote:userInfo type:@"notificationReceived" requestID:nil action:nil]; }
@@ -324,8 +360,16 @@
     AVRequireMainThread();
     if (![self canHandleRemoteNotification:notification.request.content.userInfo])
         return AVDefaultPresentationOptions();
-    [self recordRemote:notification.request.content.userInfo type:@"notificationReceived" requestID:notification.request.identifier action:nil];
-    return [self consent] && _configuration ? _configuration.foregroundPresentationOptions : UNNotificationPresentationOptionNone;
+    if (![self consent] || !_configuration) return UNNotificationPresentationOptionNone;
+    NSMutableDictionary *data = [notification.request.content.userInfo mutableCopy]; [data removeObjectForKey:@"aps"]; [data removeObjectForKey:@"_j_msgid"];
+    UNNotificationPresentationOptions options = _configuration.foregroundPresentationOptions;
+    NSString *reason = (options & ~UNNotificationPresentationOptionBadge)
+        ? [_configuration.presentationPolicy suppressionReasonForData:data context:_activeNotificationContext platform:@"ios"]
+        : @"foregroundDisabled";
+    if (reason) options &= UNNotificationPresentationOptionBadge;
+    [self recordRemote:notification.request.content.userInfo type:@"notificationReceived" requestID:notification.request.identifier action:nil
+            presentation:@{@"suppressed": @(reason != nil), @"reason": reason ?: NSNull.null}];
+    return options;
 }
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center willPresentNotification:(UNNotification *)notification
         withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
@@ -376,6 +420,18 @@
         [self finish:operation code:code result:@{@"stopped": @(stopped)}];
     }); }];
 }
+- (BOOL)setActiveNotificationContext:(NSDictionary *)context error:(NSError **)error {
+    AVRequireMainThread(); if (![self checkInitialized:error]) return NO;
+    NSDictionary *validated = AVNotificationContext(context,error); if (!validated) return NO;
+    _activeNotificationContext = validated; return YES;
+}
+- (void)clearActiveNotificationContext { AVRequireMainThread(); _activeNotificationContext = nil; }
+- (void)cleanupBadge:(BOOL)badge delivered:(BOOL)delivered {
+    if (!_initialized || ![self consent]) return;
+    if (delivered) [self removeAllDeliveredNotifications];
+    __weak AVPushClient *weakSelf = self;
+    if (badge) [self setBadge:0 completion:^(NSDictionary *result, NSError *error) { if (error) [weakSelf report:error]; }];
+}
 - (void)setBadge:(NSInteger)badge completion:(AVPushCompletion)completion {
     AVRequireMainThread(); NSParameterAssert(completion);
     if (badge < 0) { completion(nil, AVError(@"invalid_argument", @"Badge must be non-negative", nil, nil)); return; }
@@ -383,7 +439,7 @@
     if (![JPUSHService setBadge:badge]) { [self finish:operation result:nil error:AVError(@"sdk_error", @"JPush could not update its badge value", nil, nil)]; return; }
     if (@available(iOS 16.0, *)) {
         [UNUserNotificationCenter.currentNotificationCenter setBadgeCount:badge withCompletionHandler:^(NSError *error) {
-            [self finish:operation result:error ? nil : @{@"badge": @(badge)} error:error];
+            dispatch_async(dispatch_get_main_queue(), ^{ [self finish:operation result:error ? nil : @{@"badge": @(badge)} error:error]; });
         }];
     } else { UIApplication.sharedApplication.applicationIconBadgeNumber = badge; [self finish:operation result:@{@"badge": @(badge)} error:nil]; }
 }

@@ -1,6 +1,9 @@
 package com.sandrox.avvessa.bridge;
 
 import android.os.Looper;
+import android.app.NotificationManager;
+import android.app.NotificationChannel;
+import android.graphics.Color;
 import com.sandrox.avvessa.PushException;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,7 +45,22 @@ public class AvvessaBridgeTest {
     }
     @Test public void foreignIdentifiersCannotAccidentallyClearEveryNotification() throws Exception {
         error("clearNotifications", "{\"iosIdentifiers\":[\"one\"]}", "unsupported");
-        error("clearNotifications", "{\"androidIds\":[1,-2]}", "invalid_argument");
+        error("clearNotifications", "{\"androidIds\":[1,1.5]}", "invalid_argument");
+        assertTrue(call("clearNotifications", "{\"androidIds\":[-123]}").getBoolean("ok"));
+    }
+    @Test public void channelOptionsReachTheSystemAndConflictsFailExplicitly() throws Exception {
+        assertTrue(call("createNotificationChannel", "{\"id\":\"custom\",\"name\":\"Messages\",\"soundUri\":\"android.resource://example.app/raw/message\",\"vibrationPattern\":[0,250,100,250],\"lights\":true,\"lightColor\":\"#FF231F7C\",\"showBadge\":false}").getBoolean("ok"));
+        NotificationChannel channel = RuntimeEnvironment.getApplication().getSystemService(NotificationManager.class).getNotificationChannel("custom");
+        assertEquals(NotificationManager.IMPORTANCE_HIGH,channel.getImportance());
+        assertEquals("android.resource://example.app/raw/message",channel.getSound().toString());
+        assertArrayEquals(new long[]{0,250,100,250},channel.getVibrationPattern());
+        assertTrue(channel.shouldShowLights()); assertFalse(channel.canShowBadge());
+        assertEquals(Color.parseColor("#FF231F7C"),channel.getLightColor());
+        error("createNotificationChannel", "{\"id\":\"bad\",\"name\":\"Bad\",\"vibration\":false,\"vibrationPattern\":[0,100]}", "invalid_argument");
+        error("createNotificationChannel", "{\"id\":\"bad\",\"name\":\"Bad\",\"sound\":false,\"soundUri\":\"android.resource://example.app/raw/message\"}", "invalid_argument");
+        error("createNotificationChannel", "{\"id\":\"bad\",\"name\":\"Bad\",\"soundUri\":\"https://example.com/message.mp3\"}", "invalid_argument");
+        error("setActiveNotificationContext", "{\"id\":\"conversation\"}", "consent_required");
+        assertTrue(call("clearActiveNotificationContext","{}").getBoolean("ok"));
     }
     @Test public void nativeObserverAcknowledgementPrecedesReplayAndCloseOnlyDisposesOwner() throws Exception {
         List<String> messages = new ArrayList<>();

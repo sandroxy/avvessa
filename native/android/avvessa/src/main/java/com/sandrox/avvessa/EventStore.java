@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.json.JSONObject;
+import org.json.JSONArray;
 
 /** Transactions keep event insertion, deduplication and eviction consistent across processes. */
 final class EventStore extends SQLiteOpenHelper {
@@ -19,7 +20,7 @@ final class EventStore extends SQLiteOpenHelper {
     static final long DEDUP_MILLIS = 60000;
 
     EventStore(Context context) {
-        super(context, new File(context.getNoBackupFilesDir(), "avvessa.db").getPath(), null, 1,
+        super(context, new File(context.getNoBackupFilesDir(), "avvessa.db").getPath(), null, 2,
                 database -> { throw new PushException("storage_corrupt", "Avvessa storage is corrupt"); });
     }
 
@@ -27,9 +28,10 @@ final class EventStore extends SQLiteOpenHelper {
         // SQLiteOpenHelper can observe version zero concurrently in separate processes.
         database.execSQL("CREATE TABLE IF NOT EXISTS state (name TEXT PRIMARY KEY, value TEXT NOT NULL)");
         database.execSQL("CREATE TABLE IF NOT EXISTS events (position INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, received INTEGER NOT NULL, bytes INTEGER NOT NULL, payload TEXT NOT NULL)");
-        database.execSQL("CREATE TABLE IF NOT EXISTS dedup (identity TEXT PRIMARY KEY, expires INTEGER NOT NULL)");
+        database.execSQL("CREATE TABLE IF NOT EXISTS dedup (identity TEXT PRIMARY KEY, expires INTEGER NOT NULL, messageId TEXT)");
     }
     @Override public void onUpgrade(SQLiteDatabase database, int from, int to) {
+        if (from == 1 && to == 2) { database.execSQL("ALTER TABLE dedup ADD COLUMN messageId TEXT"); return; }
         throw new PushException("storage_version", "Unsupported storage migration");
     }
 
@@ -59,28 +61,52 @@ final class EventStore extends SQLiteOpenHelper {
 
     synchronized PushEvent append(String type, String messageId, String source, JSONObject data,
             JSONObject raw, String title, String body, PushConfiguration config, long now) {
+        return append(type, messageId, source, data, raw, title, body, null, config, now);
+    }
+    synchronized PushEvent append(String type, String messageId, String source, JSONObject data,
+            JSONObject raw, String title, String body, JSONObject presentation, PushConfiguration config, long now) {
         JSONObject payload = new JSONObject();
         Json.put(payload, "id", UUID.randomUUID().toString()); Json.put(payload, "type", type);
         Json.put(payload, "messageId", messageId); Json.put(payload, "source", source);
         Json.put(payload, "platform", "android"); Json.put(payload, "receivedAt", now);
         Json.put(payload, "data", data); Json.put(payload, "raw", raw);
         Json.put(payload, "title", title); Json.put(payload, "body", body);
+        Json.put(payload, "presentation", presentation);
+        if (type.startsWith("notification") && raw.has("notificationId")) Json.put(payload, "notificationId", raw.opt("notificationId"));
         String encoded = payload.toString();
         int bytes = encoded.getBytes(StandardCharsets.UTF_8).length;
         if (bytes > MAX_EVENT_BYTES) throw new PushException("event_too_large", "Push event exceeds storage limit");
-        String identity = messageId == null || messageId.isEmpty() ? null
-                : type + "\n" + source + "\n" + messageId;
+        String message = messageId == null || messageId.isEmpty() ? null : messageId;
+        List<String> identities = new ArrayList<>();
+        if (message != null) identities.add(new JSONArray().put(type).put("message").put(message).toString());
+        if (type.startsWith("notification") && raw.opt("notificationId") instanceof Number)
+            identities.add(new JSONArray().put(type).put("notification").put(raw.optInt("notificationId")).toString());
         SQLiteDatabase database = getWritableDatabase();
         database.beginTransaction();
         try {
             prune(database, config, now);
-            if (identity != null) {
-                try (Cursor cursor = database.rawQuery("SELECT 1 FROM dedup WHERE identity=?", new String[]{identity})) {
-                    if (cursor.moveToFirst()) { database.setTransactionSuccessful(); return null; }
+            boolean duplicate = false; long expiry = now + DEDUP_MILLIS;
+            for (String identity : identities) {
+                try (Cursor cursor = database.rawQuery("SELECT expires, messageId FROM dedup WHERE identity=?", new String[]{identity})) {
+                    if (cursor.moveToFirst()) {
+                        String known = cursor.getString(1);
+                        // Reusing a system notification ID for a different message must not lose that message.
+                        if (message == null || known == null || message.equals(known)) { duplicate = true; expiry = Math.min(expiry, cursor.getLong(0)); }
+                    }
                 }
-                ContentValues seen = new ContentValues(); seen.put("identity", identity); seen.put("expires", now + DEDUP_MILLIS);
-                database.insertOrThrow("dedup", null, seen);
             }
+            for (String identity : identities) {
+                ContentValues seen = new ContentValues(); seen.put("identity", identity); seen.put("expires", expiry);
+                // An unidentified callback must not erase a previously known strong identity.
+                String known = message;
+                if (known == null) try (Cursor cursor = database.rawQuery("SELECT messageId FROM dedup WHERE identity=?", new String[]{identity})) {
+                    if (cursor.moveToFirst()) known = cursor.getString(0);
+                }
+                seen.put("messageId", known);
+                if (database.insertWithOnConflict("dedup", null, seen, SQLiteDatabase.CONFLICT_REPLACE) == -1)
+                    throw new PushException("storage_write", "Cannot save notification identity");
+            }
+            if (duplicate) { prune(database, config, now); database.setTransactionSuccessful(); return null; }
             ContentValues values = new ContentValues(); values.put("id", payload.optString("id"));
             values.put("received", now); values.put("bytes", bytes); values.put("payload", encoded);
             database.insertOrThrow("events", null, values);
@@ -129,7 +155,7 @@ final class EventStore extends SQLiteOpenHelper {
     synchronized void clearEvents() {
         SQLiteDatabase database = getWritableDatabase(); database.beginTransaction();
         try {
-            database.delete("events", null, null); database.delete("dedup", null, null);
+            database.delete("events", null, null);
             database.setTransactionSuccessful();
         } finally { database.endTransaction(); }
     }

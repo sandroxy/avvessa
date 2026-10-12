@@ -24,7 +24,7 @@ legacy 通过包内 `hooksClass` 接收应用及 APNs 回调；UTS 通过导出�
 
 三种模式均需签名中的 `aps-environment` 与初始化参数、极光发送环境一致，并启用 Background Modes → Remote notifications。开发和生产 APNs 凭据由极光控制台管理，客户端不接收 p8、证书私钥或极光 Master Secret。
 
-桥接安装协作式 `UNUserNotificationCenterDelegate`，只消费核心识别出的极光通知，其他通知转交先前的 delegate。宿主若在桥接之后替换 delegate，必须向 Avvessa 转发或保留此代理关系。应用激活时桥接会恢复代理。无需在业务页面重复转发通知。
+桥接安装协作式 `UNUserNotificationCenterDelegate`，并在适配层接管当前通知中心后续的 delegate 赋值，将多个 delegate 作为弱引用观察者保留，宿主仍需持有自己的 delegate。其他通知转交这些观察者；极光通知的前台展示决定由核心统一处理，观察者不能通过 completion 覆盖抑制结果。被抑制的通知不再转发给可能二次展示的 SDK delegate，但仍有 Avvessa 接收事件。代理回调有防重入和两秒完成期限，超时会报告错误。无需在业务页面重复转发通知；原生核心自身不做此赋值拦截。
 
 ## Android 厂商通道与图标
 
@@ -46,7 +46,8 @@ legacy 通过包内 `hooksClass` 接收应用及 APNs 回调；UTS 通过导出�
     "vendorModules": [],
     "vendorProperties": {},
     "googleServicesFile": null,
-    "agconnectServicesFile": null
+    "agconnectServicesFile": null,
+    "retainedPermissions": []
   }
 }
 ```
@@ -63,7 +64,9 @@ legacy 通过包内 `hooksClass` 接收应用及 APNs 回调；UTS 通过导出�
 
 所有参数值使用字符串。资源 AAR 必须与 ZIP 中选择的厂商集合及宿主 applicationId 一致。仍需在极光／厂商后台登记正确包名、签名指纹、通道及消息分类。
 
-`android.smallIcon` 使用 `drawable/name` 或 `mipmap/name`，不存在的资源会拒绝初始化。省略时使用插件默认图标。资源 AAR 生成器的 `--small-icon` 可接收宿主白色透明背景 vector XML，生成 `drawable/avvessa_consumer_notification`。通知色值为 `#RRGGBB` 或 `#AARRGGBB`。iOS 使用应用图标。厂商离线通知的图标／分类还受厂商规则约束。
+`android.smallIcon` 使用 `drawable/name` 或 `mipmap/name`，不存在的资源会拒绝初始化。省略时使用插件默认图标。资源 AAR 生成器的 `--small-icon` 可接收白色透明背景 vector XML、单张正方形 PNG，或包含 `mdpi.png`／`hdpi.png`／`xhdpi.png`／`xxhdpi.png`／`xxxhdpi.png` 的目录，尺寸依次为 24／36／48／72／96 像素。单张 PNG 按 nodpi 打包，多密度文件原样保留，资源名均为 `drawable/avvessa_consumer_notification`。通知色值为 `#RRGGBB` 或 `#AARRGGBB`；选择 FCM 时，生成器同时配置其默认图标，`--notification-color` 可设置 FCM 默认颜色。iOS 使用应用图标。厂商离线通知的图标／分类还受厂商规则约束。
+
+生成清单默认移除 SDK 不需要的定位、电话状态、应用列表及外部存储权限。若宿主其他功能确实需要保留其中某项，可在本地 JSON 的 `android.retainedPermissions` 列出完整权限名，例如 `android.permission.READ_EXTERNAL_STORAGE`；生成器只对明确列出的已有移除项写入 `tools:node="merge"`。该配置不授予运行时权限。已有宿主清单中的声明仍需核对，合并后以最终清单为准。
 
 ## 使用
 
@@ -116,6 +119,44 @@ Android 13+ 的权限请求返回 `{requested:true, granted:null}`，表示已�
 
 参数错误、原生错误和 SDK 失败以稳定 `code` 及原始 `nativeCode/nativeDomain` 返回。未知字段、类型错误和不支持的调用不会悄悄忽略。别名标签等异步操作沿用原生核心的关联及超时机制。
 
+## 前台展示与生命周期
+
+在初始化参数中声明规则，三种模式共用原生实现。以下字段是应用自定义示例，插件不认识聊天业务：
+
+```js
+const presentationPolicy = {
+  suppressForeground: [{ match: { kind: 'quiet' }, reason: 'quietMessage' }],
+  activeContext: {
+    match: { kind: 'chat' }, idField: 'conversationId', categoryField: 'conversationType',
+    reason: 'activeConversation',
+  },
+};
+// 将 presentationPolicy 传给 initialize；完成初始化后，页面显示时设置：
+await push.setActiveNotificationContext({ id: 'conversation-a', category: 'direct' });
+// 页面隐藏／离开时清除，包括被缓存而未销毁的页面：
+await push.clearActiveNotificationContext();
+```
+
+匹配当前上下文的消息在前台不弹横幅、不播放通知音，其他消息照常请求展示；后台不应用该抑制规则。iOS 保留初始化时配置的 badge 选项。规则读取通知附加字段，完整匹配才生效，缺字段不匹配。超长 ID 用字符串。上下文仅保存在本进程，撤回隐私同意或进程结束后失效，不随订阅保留或清除。
+
+被抑制的消息仍为 `notificationReceived`，通过 `event.presentation.suppressed/reason` 观察决定，`data/raw` 保持不变；展示决定不能证明系统已经弹出横幅。Android 系统或厂商已自行渲染的通知不能被该回调追溯阻止。完整规则与去重语义见[原生契约](../../doc/contract.md#foreground-policy)。
+
+初始化的 `notificationLifecycle` 可分别启用 `clearBadgeOnStart`、`clearBadgeOnForeground`、`clearBadgeOnOpen`、`clearDeliveredOnStart`、`clearDeliveredOnForeground`，默认全部关闭。清除已展示通知会影响本应用其他功能的通知，只有宿主确认拥有这些通知时才开启；它不清除待消费事件，也不代替确认消费。当前配置在进程内不可修改，改变初始化选项后应重新启动应用。
+
+Android 8+ 可在初始化前创建渠道：
+
+```js
+if ((await push.getCapabilities()).notificationChannels) {
+  await push.createNotificationChannel({
+    id: 'messages', name: 'Messages', importance: 4,
+    vibrationPattern: [0, 250, 250, 250], lights: true, lightColor: '#FF231F7C',
+    sound: true, showBadge: true,
+  });
+}
+```
+
+`soundUri` 支持宿主提供的 `android.resource://` 或 `content://` URI；系统必须能读取该声音。振动数组最多 32 项，每项 0–60,000 毫秒，总时长须在 1–60,000 毫秒内。默认重要性为 4（HIGH），已存在渠道保留用户设置；不能靠再次创建同名渠道强制恢复横幅或声音。定向清理使用 Android 的 `event.notificationId`（允许负数）或 iOS 的 `event.transportId`。
+
 ## 从源码构建
 
 需要 JDK 17、Android SDK 36、Xcode，以及下载到本地的官方 DCloud Android AAR／iOS SDK。Swift Package Manager 从根目录 `Package.resolved` 解析官方极光 SDK：
@@ -140,7 +181,7 @@ python3 scripts/check-uniapp-uts.py dist/uniapp/avvessa-uniapp-uts-0.1.0.zip \
   --hbuilder-contents /absolute/path/to/HBuilderX \
   --classic-ios-sdk /absolute/path/to/classic-ios-sdk \
   --x-android-sdk /absolute/path/to/uniapp-x-android-sdk \
-  --x-ios-sdk /absolute/path/to/uniapp-x-ios-sdk
+  --x-ios-sdk /absolute/path/to/uniapp-x-ios-sdk --x-renderer vapor
 ```
 
-编译检查覆盖经典／X 的 Kotlin 和 Swift。它不安装应用、不发送推送，也不替代真机上的前后台、通知点击冷启动、事件重放和厂商通道验证。
+编译检查覆盖经典／X 的 Kotlin 和 Swift。`--x-renderer` 必须与所用 X SDK 一致；上述示例适用于 5.26 Vapor SDK，原生渲染 SDK 使用 `native`。`--hbuilder-contents` 指向包含 `plugins` 的 HBuilderX 运行目录。检查不安装应用、不发送推送，也不替代真机上的前后台、通知点击冷启动、事件重放和厂商通道验证。

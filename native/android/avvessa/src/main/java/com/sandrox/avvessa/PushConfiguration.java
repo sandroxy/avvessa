@@ -14,6 +14,8 @@ public final class PushConfiguration {
     public final boolean debug;
     public final boolean presentInForeground;
     public final boolean openApplicationOnClick;
+    public final NotificationPolicy presentationPolicy;
+    public final NotificationLifecycle notificationLifecycle;
     public final int maxPendingEvents;
     public final long eventTtlMillis;
 
@@ -36,6 +38,7 @@ public final class PushConfiguration {
         debug = builder.debug;
         presentInForeground = builder.foreground;
         openApplicationOnClick = builder.open;
+        presentationPolicy = builder.policy; notificationLifecycle = builder.lifecycle;
         maxPendingEvents = builder.maxEvents;
         eventTtlMillis = builder.ttl;
     }
@@ -57,6 +60,8 @@ public final class PushConfiguration {
         Json.put(data, "smallIcon", context.getResources().getResourceName(smallIcon));
         Json.put(data, "color", color); Json.put(data, "debug", debug);
         Json.put(data, "foreground", presentInForeground); Json.put(data, "open", openApplicationOnClick);
+        Json.put(data, "presentationPolicy", presentationPolicy.toJson());
+        Json.put(data, "notificationLifecycle", notificationLifecycle.toJson());
         Json.put(data, "maxEvents", maxPendingEvents); Json.put(data, "ttl", eventTtlMillis);
         return data;
     }
@@ -70,6 +75,8 @@ public final class PushConfiguration {
                 .smallIcon(icon).color(data.optInt("color"))
                 .debug(data.optBoolean("debug")).presentInForeground(data.optBoolean("foreground"))
                 .openApplicationOnClick(data.optBoolean("open"))
+                .presentationPolicy(new NotificationPolicy(data.has("presentationPolicy") ? data.optJSONObject("presentationPolicy") : new JSONObject()))
+                .notificationLifecycle(new NotificationLifecycle(data.has("notificationLifecycle") ? data.optJSONObject("notificationLifecycle") : new JSONObject()))
                 .eventRetention(data.optInt("maxEvents"), data.optLong("ttl")).build();
     }
 
@@ -79,6 +86,8 @@ public final class PushConfiguration {
         private int icon = R.drawable.avvessa_notification, color, maxEvents = 256;
         private long ttl = 72L * 3600 * 1000;
         private boolean debug, foreground = true, open = true;
+        private NotificationPolicy policy = new NotificationPolicy(new JSONObject());
+        private NotificationLifecycle lifecycle = new NotificationLifecycle(new JSONObject());
         public Builder(String appKey) { this.appKey = appKey; }
         public Builder channel(String value) { channel = value; return this; }
         public Builder notificationChannel(String id, String name) { channelId = id; channelName = name; return this; }
@@ -87,6 +96,12 @@ public final class PushConfiguration {
         public Builder debug(boolean value) { debug = value; return this; }
         public Builder presentInForeground(boolean value) { foreground = value; return this; }
         public Builder openApplicationOnClick(boolean value) { open = value; return this; }
+        public Builder presentationPolicy(NotificationPolicy value) {
+            if (value == null) throw NotificationPolicy.invalid("presentationPolicy is required"); policy = value; return this;
+        }
+        public Builder notificationLifecycle(NotificationLifecycle value) {
+            if (value == null) throw NotificationPolicy.invalid("notificationLifecycle is required"); lifecycle = value; return this;
+        }
         public Builder eventRetention(int count, long ttlMillis) { maxEvents = count; ttl = ttlMillis; return this; }
         public PushConfiguration build() { return new PushConfiguration(this); }
     }

@@ -52,9 +52,12 @@ final class PushPayloads {
         }
     }
     static void receiveNotification(Avvessa client, String type, JSONObject raw) {
+        receiveNotification(client, type, raw, null);
+    }
+    static void receiveNotification(Avvessa client, String type, JSONObject raw, JSONObject presentation) {
         client.receive(type, raw.isNull("msgId") ? null : raw.optString("msgId"), source(raw.optInt("platform")),
                 extras(client, raw.isNull("notificationExtras") ? null : raw.optString("notificationExtras")), raw,
                 raw.isNull("notificationTitle") ? null : raw.optString("notificationTitle"),
-                raw.isNull("notificationContent") ? null : raw.optString("notificationContent"));
+                raw.isNull("notificationContent") ? null : raw.optString("notificationContent"), presentation);
     }
 }

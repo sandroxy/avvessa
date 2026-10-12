@@ -11,9 +11,32 @@ import cn.jpush.android.service.JPushMessageReceiver;
 import org.json.JSONObject;
 
 public final class AvvessaReceiver extends JPushMessageReceiver {
+    private static final java.util.Map<String, Decision> decisions = new java.util.LinkedHashMap<>();
+    private static String identity(NotificationMessage message) { return message.platform + ":" + message.msgId + ":" + message.notificationId; }
+    private static synchronized void remember(NotificationMessage message, String reason) {
+        long now = android.os.SystemClock.elapsedRealtime();
+        java.util.Iterator<Decision> iterator = decisions.values().iterator();
+        while (iterator.hasNext()) if (now - iterator.next().time > 60000) iterator.remove();
+        if (decisions.size() >= 256) decisions.remove(decisions.keySet().iterator().next());
+        decisions.put(identity(message), new Decision(reason, now));
+    }
+    private static synchronized String takeReason(NotificationMessage message) {
+        Decision decision = decisions.remove(identity(message));
+        return decision != null && android.os.SystemClock.elapsedRealtime() - decision.time <= 60000 ? decision.reason : "sdk";
+    }
+    private static final class Decision {
+        final String reason; final long time;
+        Decision(String reason, long time) { this.reason = reason; this.time = time; }
+    }
     @Override public boolean isNeedShowNotification(Context context, NotificationMessage message, String source) {
         Avvessa client = Avvessa.getInstance(context);
-        return client.mayReceive() && (client.configuration().presentInForeground || !PushNotifications.foreground());
+        if (!client.mayReceive()) return false;
+        String reason = client.suppressionReason(PushPayloads.extras(client, message.notificationExtras), PushNotifications.foreground());
+        if (reason != null) {
+            // Freeze the decision before the page/context can change; the SDK then calls onNotifyMessageUnShow.
+            remember(message, reason);
+        }
+        return reason == null;
     }
     @Override public Notification getNotification(Context context, NotificationMessage message) {
         Avvessa client = Avvessa.getInstance(context);
@@ -39,10 +62,14 @@ public final class AvvessaReceiver extends JPushMessageReceiver {
         notification(context, "notificationDismissed", message);
     }
     @Override public void onNotifyMessageUnShow(Context context, NotificationMessage message) {
-        notification(context, "notificationSuppressed", message);
+        PushPayloads.receiveNotification(Avvessa.getInstance(context), "notificationReceived", PushPayloads.notification(message), presentation(true, takeReason(message)));
+    }
+    private static JSONObject presentation(boolean suppressed, String reason) {
+        JSONObject result = new JSONObject(); Json.put(result, "suppressed", suppressed); Json.put(result, "reason", reason); return result;
     }
     private void notification(Context context, String type, NotificationMessage message) {
-        PushPayloads.receiveNotification(Avvessa.getInstance(context), type, PushPayloads.notification(message));
+        PushPayloads.receiveNotification(Avvessa.getInstance(context), type, PushPayloads.notification(message),
+                type.equals("notificationReceived") ? presentation(false, null) : null);
     }
     @Override public void onMessage(Context context, CustomMessage message) {
         Avvessa client = Avvessa.getInstance(context);

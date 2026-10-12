@@ -5,6 +5,20 @@ const source = await readFile(new URL('../js_sdk/bridge.js', import.meta.url), '
 const { createAvvessa, AvvessaError } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 const ok = data => JSON.stringify({ ok: true, data });
 
+test('presentation policy and context preserve exact scalar values across the bridge', async () => {
+  const calls = [];
+  const api = createAvvessa((method, json, callback) => { calls.push([method, JSON.parse(json)]); callback(ok(null)); });
+  const policy = { activeContext: { match: { kind: 'chat' }, idField: 'conversationId', categoryField: 'conversationType' } };
+  await api.initialize({ appKey: '000000000000000000000000', presentationPolicy: policy, notificationLifecycle: { clearBadgeOnOpen: true } });
+  await api.setActiveNotificationContext({ id: '9007199254740993', category: 'direct' });
+  await api.clearActiveNotificationContext();
+  assert.deepEqual(calls, [
+    ['initialize', { appKey: '000000000000000000000000', presentationPolicy: policy, notificationLifecycle: { clearBadgeOnOpen: true } }],
+    ['setActiveNotificationContext', { id: '9007199254740993', category: 'direct' }],
+    ['clearActiveNotificationContext', {}]
+  ]);
+});
+
 test('stream preserves native payloads and event IDs without acknowledging or stopping push', async () => {
   const commands = []; let emit; let id;
   const api = createAvvessa((method, json, callback) => {

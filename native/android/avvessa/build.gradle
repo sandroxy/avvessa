@@ -14,6 +14,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    sourceSets.test.resources.srcDir(rootProject.file("../../tests"))
     // Unit tests use framework resources only and must not load SDK startup components.
     testOptions { unitTests.includeAndroidResources = false }
 }

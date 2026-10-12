@@ -4,15 +4,17 @@
 
 Avvessa provides native Android and iOS push APIs on top of the official Jiguang SDKs. Initialize with an AppKey, configure APNs or the required Android vendor channels, and consume notifications, custom messages, and notification interactions.
 
-The core has no React Native, Expo, or DCloud dependency. Authentication, account binding, navigation, and server-side sending belong to the application. UNI adapters support legacy nativeplugins, classic UTS, and uni-app x. RN, Flutter, and incoming-call APIs are not provided.
+The core has no React Native, Expo, or DCloud dependency. Authentication, account binding, navigation, and server-side sending belong to the application. UNI adapters support legacy nativeplugins, classic UTS, and uni-app x. RN and Flutter APIs are not provided. Incoming-call state, PushKit/CallKit, call controls and call UI belong to a separate calling component and are outside Avvessa's scope.
 
 ## Native capabilities
 
 - Explicit consent and initialization, with separate system notification authorization.
 - RegistrationID, connection and stopped state, notification authorization, and structured errors.
 - Durable native events with subscriptions, replay, deduplication, and explicit acknowledgement.
-- Android small icons, colors, notification channels, and foreground presentation policy.
-- iOS APNs, foreground presentation, notification actions, badges, and delegate forwarding.
+- Android small icons, colors, notification channels, sound, vibration and lights.
+- Foreground presentation rules based on message fields and the current application context, preserving receipt events.
+- iOS APNs, foreground presentation, notification actions, badges, and multiple cooperating delegates.
+- Optional badge and delivered-notification cleanup at application lifecycle boundaries.
 - Alias and tag operations, push stop/resume, and delivered-notification removal.
 - Optional Xiaomi, Huawei, OPPO, vivo, HONOR, Meizu, and FCM modules.
 

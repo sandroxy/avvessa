@@ -5,6 +5,15 @@ NSError *AVError(NSString *code, NSString *message, NSNumber *_Nullable nativeCo
 void AVRequireMainThread(void);
 UNNotificationPresentationOptions AVDefaultPresentationOptions(void);
 
+NSDictionary *_Nullable AVNotificationContext(NSDictionary *value, NSError *_Nullable *_Nullable error);
+@interface AVNotificationPolicy (Internal)
+- (nullable NSString *)suppressionReasonForData:(nullable NSDictionary *)data context:(nullable NSDictionary *)context platform:(NSString *)platform;
+@end
+
+@interface AVNotificationDelegate (Internal)
+- (instancetype)initWithPrimary:(id<UNUserNotificationCenterDelegate>)primary owns:(BOOL (^)(NSDictionary *))owns failure:(void (^)(NSError *))failure;
+@end
+
 @interface AVPushConfiguration (Internal)
 - (BOOL)validateWithError:(NSError *_Nullable *_Nullable)error;
 - (NSDictionary *)dictionary;
@@ -21,6 +30,8 @@ UNNotificationPresentationOptions AVDefaultPresentationOptions(void);
 - (BOOL)setStateValue:(nullable id)value forKey:(NSString *)key error:(NSError *_Nullable *_Nullable)error;
 - (BOOL)revokeConsentWithError:(NSError *_Nullable *_Nullable)error;
 - (nullable AVPushEvent *)append:(NSDictionary *)event deduplicationKey:(nullable NSString *)key
+                  configuration:(AVPushConfiguration *)configuration error:(NSError *_Nullable *_Nullable)error;
+- (nullable AVPushEvent *)append:(NSDictionary *)event deduplicationKeys:(NSArray<NSString *> *)keys messageID:(nullable NSString *)messageID
                   configuration:(AVPushConfiguration *)configuration error:(NSError *_Nullable *_Nullable)error;
 - (nullable NSArray<AVPushEvent *> *)pending:(AVPushConfiguration *)configuration error:(NSError *_Nullable *_Nullable)error;
 - (BOOL)acknowledge:(NSString *)eventID error:(NSError *_Nullable *_Nullable)error;

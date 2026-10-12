@@ -82,6 +82,8 @@ export function createAvvessa(transport) {
     getPendingEvents: () => invoke('getPendingEvents'), acknowledge: eventId => invoke('acknowledge', { eventId }),
     clearPendingEvents: () => invoke('clearPendingEvents'), subscribe, unsubscribe,
     stopPush: () => invoke('stopPush'), resumePush: () => invoke('resumePush'),
+    setActiveNotificationContext: context => invoke('setActiveNotificationContext', context),
+    clearActiveNotificationContext: () => invoke('clearActiveNotificationContext'),
     setBadge: badge => invoke('setBadge', { badge }), clearNotifications: (options = {}) => invoke('clearNotifications', options),
     createNotificationChannel: options => invoke('createNotificationChannel', options),
     setNotificationCategories: categories => invoke('setNotificationCategories', { categories }),

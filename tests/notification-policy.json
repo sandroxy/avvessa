@@ -1,0 +1,489 @@
+{
+  "cases": [
+    {
+      "name": "current conversation",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": 42,
+        "conversationType": "direct"
+      },
+      "context": {
+        "id": "42",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": "activeConversation"
+    },
+    {
+      "name": "another conversation",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": 43,
+        "conversationType": "direct"
+      },
+      "context": {
+        "id": "42",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "same id another category",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": 42,
+        "conversationType": "group"
+      },
+      "context": {
+        "id": "42",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "unrelated notification",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "status",
+        "conversationId": 42,
+        "conversationType": "direct"
+      },
+      "context": {
+        "id": "42",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "context removed",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": 42,
+        "conversationType": "direct"
+      },
+      "context": null,
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "missing category is not a match",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": 42
+      },
+      "context": {
+        "id": "42",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "static rule",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "silent"
+      },
+      "context": null,
+      "platform": "android",
+      "reason": "quiet"
+    },
+    {
+      "name": "payload preserved with nested field",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "nested": {
+          "conversationId": 42
+        },
+        "conversationType": "direct"
+      },
+      "context": {
+        "id": "42",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "platform excluded",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "platforms": [
+              "ios"
+            ]
+          }
+        ]
+      },
+      "data": {
+        "kind": "silent"
+      },
+      "context": null,
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "platform included",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "platforms": [
+              "ios"
+            ]
+          }
+        ]
+      },
+      "data": {
+        "kind": "silent"
+      },
+      "context": null,
+      "platform": "ios",
+      "reason": "rule"
+    },
+    {
+      "name": "long string identifier",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": "9007199254740993",
+        "conversationType": "direct"
+      },
+      "context": {
+        "id": "9007199254740993",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": "activeConversation"
+    },
+    {
+      "name": "unsafe numeric identifier cannot match",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "kind": "silent"
+            },
+            "reason": "quiet"
+          }
+        ],
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId",
+          "categoryField": "conversationType",
+          "reason": "activeConversation"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": 9007199254740993,
+        "conversationType": "direct"
+      },
+      "context": {
+        "id": "9007199254740993",
+        "category": "direct"
+      },
+      "platform": "android",
+      "reason": null
+    },
+    {
+      "name": "id without category rule",
+      "policy": {
+        "activeContext": {
+          "match": {
+            "kind": "chat"
+          },
+          "idField": "conversationId"
+        }
+      },
+      "data": {
+        "kind": "chat",
+        "conversationId": true
+      },
+      "context": {
+        "id": "true"
+      },
+      "platform": "ios",
+      "reason": "activeContext"
+    },
+    {
+      "name": "decimal scalar",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "level": "0.25"
+            }
+          }
+        ]
+      },
+      "data": {
+        "level": 0.25
+      },
+      "context": null,
+      "platform": "ios",
+      "reason": "rule"
+    },
+    {
+      "name": "small decimal scalar",
+      "policy": {
+        "suppressForeground": [
+          {
+            "match": {
+              "level": "0.000001"
+            }
+          }
+        ]
+      },
+      "data": {
+        "level": 1e-06
+      },
+      "context": null,
+      "platform": "ios",
+      "reason": "rule"
+    }
+  ],
+  "invalidPolicies": [
+    {
+      "typo": true
+    },
+    {
+      "suppressForeground": null
+    },
+    {
+      "suppressForeground": [
+        {
+          "match": {}
+        }
+      ]
+    },
+    {
+      "activeContext": {
+        "match": {
+          "kind": "chat"
+        }
+      }
+    },
+    {
+      "suppressForeground": [
+        {
+          "match": {
+            "key": null
+          }
+        }
+      ]
+    },
+    {
+      "suppressForeground": [
+        {
+          "match": {
+            "key": []
+          }
+        }
+      ]
+    },
+    {
+      "suppressForeground": [
+        {
+          "match": {
+            "key": 1
+          },
+          "platforms": [
+            "ios",
+            "ios"
+          ]
+        }
+      ]
+    },
+    {
+      "suppressForeground": [
+        {
+          "match": {
+            "key": 1
+          },
+          "platforms": [
+            "web"
+          ]
+        }
+      ]
+    },
+    {
+      "suppressForeground": [
+        {
+          "match": {
+            "key": 9007199254740992
+          }
+        }
+      ]
+    }
+  ]
+}

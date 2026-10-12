@@ -3,7 +3,7 @@
 
 static BOOL AVValidStoredRoot(id root) {
     if (![root isKindOfClass:NSDictionary.class] || ![root[@"schema"] isKindOfClass:NSNumber.class]
-        || [root[@"schema"] integerValue] != 1 || ![root[@"state"] isKindOfClass:NSDictionary.class]
+        || ![@[@1,@2] containsObject:root[@"schema"]] || ![root[@"state"] isKindOfClass:NSDictionary.class]
         || ![root[@"events"] isKindOfClass:NSArray.class] || ![root[@"dedup"] isKindOfClass:NSDictionary.class]
         || ![root[@"dropped"] isKindOfClass:NSNumber.class] || [root[@"dropped"] doubleValue] < 0) return NO;
     NSDictionary *state = root[@"state"];
@@ -17,8 +17,14 @@ static BOOL AVValidStoredRoot(id root) {
             || ![event[@"raw"] isKindOfClass:NSDictionary.class]
             || ![event[@"receivedAt"] isKindOfClass:NSNumber.class] || !isfinite([event[@"receivedAt"] doubleValue])) return NO;
     }
-    for (id expiry in [root[@"dedup"] allValues])
+    for (id entry in [root[@"dedup"] allValues]) {
+        id expiry = entry;
+        if ([root[@"schema"] integerValue] == 2) {
+            if (![entry isKindOfClass:NSDictionary.class] || (![entry[@"messageId"] isKindOfClass:NSString.class] && entry[@"messageId"] != NSNull.null)) return NO;
+            expiry = entry[@"expires"];
+        }
         if (![expiry isKindOfClass:NSNumber.class] || !isfinite([expiry doubleValue])) return NO;
+    }
     return YES;
 }
 
@@ -43,8 +49,13 @@ static BOOL AVValidStoredRoot(id root) {
                 return nil;
             }
             _root = decoded;
+            if ([_root[@"schema"] integerValue] == 1) {
+                NSMutableDictionary *dedup = _root[@"dedup"];
+                for (NSString *key in dedup.allKeys) dedup[key] = @{@"expires":dedup[key],@"messageId":NSNull.null};
+                _root[@"schema"] = @2;
+            }
         } else {
-            _root = [@{@"schema": @1, @"state": [NSMutableDictionary dictionary], @"events": [NSMutableArray array],
+            _root = [@{@"schema": @2, @"state": [NSMutableDictionary dictionary], @"events": [NSMutableArray array],
                        @"dedup": [NSMutableDictionary dictionary], @"dropped": @0} mutableCopy];
         }
     }
@@ -82,15 +93,18 @@ static BOOL AVValidStoredRoot(id root) {
         return [event[@"receivedAt"] doubleValue] <= now - config.eventRetention * 1000;
     }];
     [events removeObjectsAtIndexes:expired];
-    for (NSString *key in [dedup.allKeys copy]) if ([dedup[key] doubleValue] <= now) [dedup removeObjectForKey:key];
+    for (NSString *key in [dedup.allKeys copy]) if ([dedup[key][@"expires"] doubleValue] <= now) [dedup removeObjectForKey:key];
     while (events.count > config.maxPendingEvents) [events removeObjectAtIndex:0];
     while (events.count && [NSJSONSerialization dataWithJSONObject:events options:0 error:nil].length > 4 * 1024 * 1024)
         [events removeObjectAtIndex:0];
-    NSArray *keys = [dedup keysSortedByValueUsingSelector:@selector(compare:)];
+    NSArray *keys = [dedup keysSortedByValueUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) { return [a[@"expires"] compare:b[@"expires"]]; }];
     if (keys.count > 5000) [dedup removeObjectsForKeys:[keys subarrayWithRange:NSMakeRange(0, keys.count - 5000)]];
     candidate[@"dropped"] = @([candidate[@"dropped"] unsignedIntegerValue] + originalCount - events.count);
 }
 - (AVPushEvent *)append:(NSDictionary *)event deduplicationKey:(NSString *)key configuration:(AVPushConfiguration *)configuration error:(NSError **)error {
+    return [self append:event deduplicationKeys:key ? @[key] : @[] messageID:nil configuration:configuration error:error];
+}
+- (AVPushEvent *)append:(NSDictionary *)event deduplicationKeys:(NSArray<NSString *> *)keys messageID:(NSString *)messageID configuration:(AVPushConfiguration *)configuration error:(NSError **)error {
     if (![NSJSONSerialization isValidJSONObject:event]) {
         if (error) *error = AVError(@"invalid_data", @"Push payload is not JSON compatible", nil, nil);
         return nil;
@@ -102,8 +116,16 @@ static BOOL AVValidStoredRoot(id root) {
     NSMutableDictionary *candidate = [self candidate];
     double now = NSDate.date.timeIntervalSince1970 * 1000;
     [self prune:candidate configuration:configuration now:now];
-    if (key && candidate[@"dedup"][key]) return nil;
-    if (key) candidate[@"dedup"][key] = @(now + 60000);
+    BOOL duplicate = NO; double expiry = now + 60000;
+    NSMutableDictionary *dedup = candidate[@"dedup"];
+    for (NSString *key in keys) {
+        NSDictionary *entry = dedup[key]; id known = entry[@"messageId"];
+        if (entry && (!messageID.length || known == NSNull.null || [known isEqual:messageID])) {
+            duplicate = YES; expiry = MIN(expiry,[entry[@"expires"] doubleValue]);
+        }
+    }
+    for (NSString *key in keys) dedup[key] = @{@"expires":@(expiry),@"messageId":messageID ?: dedup[key][@"messageId"] ?: NSNull.null};
+    if (duplicate) { [self prune:candidate configuration:configuration now:now]; [self commit:candidate error:error]; return nil; }
     [candidate[@"events"] addObject:event];
     [self prune:candidate configuration:configuration now:now];
     return [self commit:candidate error:error] ? [[AVPushEvent alloc] initWithDictionary:event replayed:NO] : nil;
@@ -130,7 +152,7 @@ static BOOL AVValidStoredRoot(id root) {
 }
 - (BOOL)clearWithError:(NSError **)error {
     NSMutableDictionary *candidate = [self candidate];
-    [candidate[@"events"] removeAllObjects]; [candidate[@"dedup"] removeAllObjects];
+    [candidate[@"events"] removeAllObjects];
     return [self commit:candidate error:error];
 }
 @end

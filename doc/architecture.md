@@ -11,13 +11,17 @@ flowchart TD
     SDK --> Transport[APNs or selected Android vendor modules]
 ```
 
-The adapter boundary describes dependency direction; it is not a claim that framework adapters are included.
+The adapter boundary describes dependency direction. UNI legacy, classic UTS and uni-app x share the same native policy and storage implementations.
 
 ## Ownership
 
 The Android implementation uses Java and the iOS implementation uses Objective-C with explicit Swift names for callback forwarding. Both can be called without a framework runtime. SDK objects stay inside the core; public events expose JSON-compatible snapshots.
 
 The core owns initialization, native callback capture, notification defaults, event persistence and SDK operation correlation. Applications own their consent decision, server configuration, application signing, payload meaning, login, account association and navigation. A notification click can open the Android launcher; it cannot select a business screen.
+
+Presentation rules compare explicit payload fields. The application supplies the current context and clears it when leaving that context. The core does not know conversations, participants, customer service pages or routes. Rules run before local system presentation and preserve the notification receipt, so applications can update visible content without a second banner.
+
+Incoming-call handling is outside this package: PushKit delivery obligations, CallKit/Android call UI, accept/reject/timeout state and media sessions form a separate calling component. That component can compose ordinary push events and presentation rules, but Avvessa does not turn a data message into a call or claim call delivery guarantees. Android's raw SDK `voipMessage` event is payload transport only.
 
 ## Android
 
@@ -29,7 +33,7 @@ The base artifact does not depend on vendor SDKs. Each optional vendor artifact 
 
 ## iOS
 
-`AVPushClient` is a main-thread singleton. It observes SDK registration, connection and custom-message notifications. It does not swizzle application delegates or assign itself as the notification center delegate. A host either assigns the client explicitly or forwards the relevant callbacks.
+`AVPushClient` is a main-thread singleton. It observes SDK registration, connection and custom-message notifications. The core does not swizzle delegates or assign itself as the notification center delegate. A native host explicitly installs its `notificationDelegate` coordinator or forwards the relevant callbacks. The coordinator owns completion handlers, supports multiple weak observers and prevents observers from overriding an owned notification's presentation decision.
 
 APNs registration and system authorization are separate. A notification response carries its action metadata beside the untouched APNs dictionary. The documented JPush message marker identifies notifications owned by the client.
 
@@ -48,5 +52,7 @@ Host applications and delivery acceptance belong to a separate integration repos
 ## UNI adapters
 
 The shared Android and iOS bridge validates JSON commands and owns observer lifetimes. The legacy DCloud module and UTS entry points forward to that bridge. Classic JavaScript uses one persistent event channel; uni-app x uses a UTS facade in the consumer runtime with the same single-channel subscription model. iOS application hooks capture APNs callbacks before page creation, allowing the core to persist cold-start interactions. No adapter acknowledges an event automatically.
+
+Only the UNI adapter intercepts notification-center delegate assignments, because framework and plugin hooks may install delegates in different orders. Assignments on the managed center add observers to the core coordinator; other centers are unaffected. This framework integration is not a dependency or implicit behavior of the native core.
 
 Public UNI packages contain only code and selected SDK dependencies. Application-specific vendor resources are assembled separately into a consumer AAR. This artifact belongs to the host and must not be included in a redistributed plugin package.

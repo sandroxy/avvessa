@@ -5,10 +5,30 @@ export class AvvessaError extends Error implements PushError {
   code: string; nativeCode: number | null; nativeDomain: string | null;
   constructor(payload: Partial<PushError>);
 }
+/** Scalar comparisons use canonical text. Send long identifiers as strings. */
+export type NotificationScalar = string | number | boolean;
+export interface NotificationRule {
+  match: Record<string, NotificationScalar>;
+  platforms?: ('android' | 'ios')[];
+  reason?: string;
+}
+export interface NotificationPolicy {
+  suppressForeground?: NotificationRule[];
+  activeContext?: NotificationRule & { idField: string; categoryField?: string };
+}
+export interface NotificationLifecycle {
+  clearBadgeOnStart?: boolean;
+  clearBadgeOnForeground?: boolean;
+  clearBadgeOnOpen?: boolean;
+  clearDeliveredOnStart?: boolean;
+  clearDeliveredOnForeground?: boolean;
+}
 export interface PushConfiguration {
   appKey: string;
   channel?: string;
   debug?: boolean;
+  presentationPolicy?: NotificationPolicy;
+  notificationLifecycle?: NotificationLifecycle;
   maxPendingEvents?: number;
   eventRetentionMilliseconds?: number;
   android?: {
@@ -35,7 +55,7 @@ export interface PushState {
 }
 export interface PushEvent {
   id: string;
-  type: 'notificationReceived' | 'notificationOpened' | 'notificationDismissed' | 'notificationSuppressed' | 'customMessage' | 'voipMessage';
+  type: 'notificationReceived' | 'notificationOpened' | 'notificationDismissed' | 'customMessage' | 'voipMessage';
   messageId: string | null;
   platform: 'android' | 'ios';
   source: string;
@@ -45,13 +65,16 @@ export interface PushEvent {
   data: JsonObject | null;
   raw: JsonObject;
   replayed: boolean;
+  presentation?: { suppressed: boolean; reason: string | null } | null;
+  notificationId?: number;
   transportId?: string | null;
   action?: { identifier: string; userText?: string } | null;
 }
 export type PushObservation = { kind: 'event'; event: PushEvent } | { kind: 'state'; state: PushState } | { kind: 'error'; error: PushError };
 export interface NotificationChannel {
   id: string; name: string; importance?: 0 | 1 | 2 | 3 | 4 | 5;
-  description?: string; sound?: boolean; vibration?: boolean; showBadge?: boolean;
+  description?: string; sound?: boolean; soundUri?: string; vibration?: boolean; vibrationPattern?: number[];
+  lights?: boolean; lightColor?: string; showBadge?: boolean;
 }
 export interface NotificationCategory {
   identifier: string; customDismissAction?: boolean;
@@ -78,6 +101,9 @@ export function subscribe(listener: (message: PushObservation) => void, options?
 export function unsubscribe(subscriptionId: string): Promise<void>;
 export function stopPush(): Promise<void>;
 export function resumePush(): Promise<void>;
+/** Transient context; does not survive process death or consent withdrawal. */
+export function setActiveNotificationContext(context: { id: NotificationScalar; category?: NotificationScalar }): Promise<void>;
+export function clearActiveNotificationContext(): Promise<void>;
 export function setBadge(badge: number): Promise<void>;
 /** Pass no options to remove all delivered notifications. Identifiers for only the other platform are rejected. */
 export function clearNotifications(options?: { androidIds?: number[]; iosIdentifiers?: string[] }): Promise<void>;

@@ -20,6 +20,8 @@ Pods/
 unpackage/
 coverage/
 .cache/
+__pycache__/
+*.pyc
 
 # Machine-specific configuration and runtime evidence
 local.properties

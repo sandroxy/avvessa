@@ -70,6 +70,9 @@ public final class Avvessa {
     private volatile long consentGeneration;
     private PushException lastError;
     private String savedAppKey;
+    private JSONObject activeNotificationContext;
+    private boolean lifecycleInstalled;
+    private boolean pendingOpenCleanup;
 
     private Avvessa(Context context) {
         this.context = context;
@@ -90,6 +93,7 @@ public final class Avvessa {
         else {
             store.revokeConsent();
             consentGeneration++;
+            activeNotificationContext = null; pendingOpenCleanup = false;
             if (initialized) {
                 try { JPushInterface.stopPush(context); }
                 catch (RuntimeException error) { report(new PushException("sdk_error", "Cannot confirm SDK shutdown", error)); }
@@ -148,6 +152,11 @@ public final class Avvessa {
         JPushInterface.init(context, sdkConfig);
         JPushInterface.setNotificationCallBackEnable(context, true);
         initialized = true;
+        if (!lifecycleInstalled && context instanceof Application) {
+            ((Application) context).registerActivityLifecycleCallbacks(new PushLifecycle(this)); lifecycleInstalled = true;
+        }
+        cleanup(pendingOpenCleanup || config.notificationLifecycle.clearBadgeOnStart, config.notificationLifecycle.clearDeliveredOnStart);
+        pendingOpenCleanup = false;
         String registration = JPushInterface.getRegistrationID(context);
         if (registration != null && !registration.isEmpty()) store.state("registrationId", registration);
         emitState();
@@ -171,6 +180,7 @@ public final class Avvessa {
         Json.put(result, "vendorModules", new JSONArray(PushVendors.installed(context)));
         Json.put(result, "notificationChannels", Build.VERSION.SDK_INT >= 26);
         Json.put(result, "runtimeNotificationPermission", Build.VERSION.SDK_INT >= 33);
+        Json.put(result, "presentationPolicy", true); Json.put(result, "notificationLifecycle", true);
         Json.put(result, "durableEvents", true); Json.put(result, "incomingCalls", false);
         return result;
     }
@@ -220,6 +230,27 @@ public final class Avvessa {
         String registration = JPushInterface.getRegistrationID(context);
         if (registration != null && !registration.isEmpty()) store.state("registrationId", registration);
         emitState();
+    }
+    /** Context is memory-only, never restored after process death or consent withdrawal. */
+    public synchronized void setActiveNotificationContext(JSONObject value) {
+        requireMainThread(); requireInitialized(); activeNotificationContext = NotificationPolicy.context(value);
+    }
+    public synchronized void clearActiveNotificationContext() { requireMainThread(); activeNotificationContext = null; }
+    synchronized String suppressionReason(JSONObject data, boolean foreground) {
+        if (!mayReceive() || !foreground) return null;
+        if (!configuration.presentInForeground) return "foregroundDisabled";
+        return configuration.presentationPolicy.suppressionReason(data, activeNotificationContext, "android");
+    }
+    synchronized void foregrounded() {
+        if (!initialized || !store.consent()) return;
+        cleanup(configuration.notificationLifecycle.clearBadgeOnForeground, configuration.notificationLifecycle.clearDeliveredOnForeground);
+        emitState();
+    }
+    private void cleanup(boolean badge, boolean delivered) {
+        try {
+            if (delivered) clearAllNotifications();
+            if (badge) setBadge(0);
+        } catch (RuntimeException error) { report(new PushException("notification_cleanup", "Could not complete notification cleanup", error)); }
     }
     public synchronized void setBadge(int number) {
         requireInitialized();
@@ -317,9 +348,17 @@ public final class Avvessa {
 
     synchronized void receive(String type, String messageId, String source, JSONObject data,
             JSONObject raw, String title, String body) {
+        receive(type, messageId, source, data, raw, title, body, null);
+    }
+    synchronized void receive(String type, String messageId, String source, JSONObject data,
+            JSONObject raw, String title, String body, JSONObject presentation) {
         if (!mayReceive()) return;
         try {
-            PushEvent event = store.append(type, messageId, source, data, raw, title, body, configuration, System.currentTimeMillis());
+            PushEvent event = store.append(type, messageId, source, data, raw, title, body, presentation, configuration, System.currentTimeMillis());
+            if (event != null && type.equals("notificationOpened") && configuration.notificationLifecycle.clearBadgeOnOpen) {
+                if (initialized) main.post(() -> { synchronized (Avvessa.this) { if (store.consent()) cleanup(true, false); } });
+                else pendingOpenCleanup = true;
+            }
             if (event != null) for (Observer observer : new ArrayList<>(observers)) deliver(observer, event);
         } catch (RuntimeException error) {
             report(error instanceof PushException ? (PushException) error : new PushException("storage_write", "Could not persist push event", error));

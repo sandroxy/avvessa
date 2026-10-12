@@ -13,7 +13,7 @@ cd native/android
 
 `publish` writes only to `native/android/build/maven`. It does not publish to a remote registry. The directory contains the base and optional vendor artifacts, POMs, source jars and Gradle metadata. Consumers should use Maven metadata instead of copying only an AAR and losing transitive dependencies.
 
-The storage tests run with SDK startup components excluded and do not initialize JPush. They cover persistence, acknowledgement, phase deduplication, unidentified messages, eviction, concurrent creation and privacy withdrawal.
+The tests run with SDK startup components excluded and do not initialize JPush. They cover persistence, acknowledgement, cross-callback identity aliases, reused notification IDs, unidentified messages, eviction, concurrent creation, privacy withdrawal, receipt preservation during suppression, and foreground transition boundaries. Android and iOS policy tests consume the same JSON fixtures.
 
 The checked-in Gradle wrapper and Android Gradle Plugin form the supported local build baseline. The official JPush and some vendor jars emit R8 stack-map warnings with this toolchain. Do not hide those warnings or treat compilation as device validation; verify release builds when changing the SDK or shrinker.
 
@@ -28,10 +28,11 @@ xcodebuild -scheme Avvessa -destination 'generic/platform=iOS' \
 xcodebuild -scheme Avvessa -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath .build/ios-simulator CODE_SIGNING_ALLOWED=NO build
 ./scripts/check-ios-storage.sh
+./scripts/check-ios-notifications.sh
 pod ipc spec Avvessa.podspec
 ```
 
-The storage script compiles only the event/configuration types and store against macOS Foundation and UserNotifications. It does not load JPush, launch a simulator, register APNs or establish a push connection. This is a storage check, not macOS product support.
+The scripts compile event/configuration types, storage, policy and delegate coordination against macOS Foundation and UserNotifications. They do not load JPush, launch a simulator, register APNs or establish a push connection. They check persistence and storage upgrades, selective presentation, delegate ownership, duplicate completion, recursion and timeout behavior. These isolated checks are not macOS product support.
 
 For CocoaPods consumer builds, use the source podspec described in the [iOS guide](native/ios/README.md). Swift Package Manager and CocoaPods are alternative dependency paths; do not install both into the same target.
 
@@ -56,6 +57,7 @@ After packaging, check the bridge contracts and a complete Android dependency me
 
 ```sh
 node --test adapters/uniapp/tests/*.test.mjs
+python3 -m unittest discover -s scripts/tests -v
 native/android/gradlew -p adapters/android \
   -PavvessaCoreAar="$PWD/native/android/avvessa/build/outputs/aar/avvessa-release.aar" \
   :bridge:testDebugUnitTest

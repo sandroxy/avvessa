@@ -10,7 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 /** UNI host callbacks, independent of either DCloud binary runtime. */
-@interface AVUniLifecycle : NSObject <UNUserNotificationCenterDelegate>
+@interface AVUniLifecycle : NSObject
 @property(class, nonatomic, readonly) AVUniLifecycle *shared;
 @property(nonatomic, copy, readonly, nullable) NSDictionary *launchOptions;
 - (void)launch:(nullable NSDictionary *)options NS_SWIFT_NAME(launch(_:));

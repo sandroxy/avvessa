@@ -93,8 +93,8 @@ static void Send(AVJSONCallback callback, id data, NSError *error) {
     };
     if (NSThread.isMainThread) work(); else dispatch_async(dispatch_get_main_queue(), work);
 }
-- (AVPushConfiguration *)configuration:(NSDictionary *)args {
-    Fields(args,@[@"appKey",@"channel",@"debug",@"maxPendingEvents",@"eventRetentionMilliseconds",@"android",@"ios"]);
+- (AVPushConfiguration *)configuration:(NSDictionary *)args error:(NSError **)error {
+    Fields(args,@[@"appKey",@"channel",@"debug",@"maxPendingEvents",@"eventRetentionMilliseconds",@"android",@"ios",@"presentationPolicy",@"notificationLifecycle"]);
     NSDictionary *ios = Object(args,@"ios"), *android = Object(args,@"android");
     Fields(ios,@[@"apnsEnvironment",@"foregroundPresentation"]);
     Fields(android,@[@"smallIcon",@"color",@"notificationChannelId",@"notificationChannelName",@"presentInForeground",@"openApplicationOnClick"]);
@@ -105,6 +105,10 @@ static void Send(AVJSONCallback callback, id data, NSError *error) {
     NSString *environment = Text(ios,@"apnsEnvironment",nil);
     if (![@[@"development",@"production"] containsObject:environment]) @throw Invalid(@"ios.apnsEnvironment must be development or production");
     AVPushConfiguration *config = [[AVPushConfiguration alloc] initWithAppKey:Text(args,@"appKey",nil) production:[environment isEqual:@"production"]];
+    config.presentationPolicy = [[AVNotificationPolicy alloc] initWithDictionary:Object(args,@"presentationPolicy") error:error];
+    if (!config.presentationPolicy) return nil;
+    config.notificationLifecycle = [[AVNotificationLifecycle alloc] initWithDictionary:Object(args,@"notificationLifecycle") error:error];
+    if (!config.notificationLifecycle) return nil;
     config.channel = Text(args,@"channel",@"default"); config.debug = BoolValue(args,@"debug",NO);
     config.maxPendingEvents = Integer(args,@"maxPendingEvents",256,1,1000);
     config.eventRetention = Integer(args,@"eventRetentionMilliseconds",259200000,60000,2592000000) / 1000.0;
@@ -127,7 +131,8 @@ static void Send(AVJSONCallback callback, id data, NSError *error) {
     if ([method isEqual:@"getState"]) { Fields(args,@[]); Send(completion,client.state,nil); return; }
     if ([method isEqual:@"getCapabilities"]) { Fields(args,@[]); Send(completion,client.capabilities,nil); return; }
     if ([method isEqual:@"initialize"]) {
-        AVPushConfiguration *config = [self configuration:args];
+        AVPushConfiguration *config = [self configuration:args error:&error];
+        if (!config) { Send(completion,nil,error); return; }
         [AVUniLifecycle.shared activate];
         [client initializeWithConfiguration:config launchOptions:AVUniLifecycle.shared.launchOptions error:&error];
     } else if ([method isEqual:@"setConsentGranted"]) {
@@ -156,10 +161,12 @@ static void Send(AVJSONCallback callback, id data, NSError *error) {
     } else if ([method isEqual:@"unsubscribe"]) { Fields(args,@[@"subscriptionId"]); [self remove:Text(args,@"subscriptionId",nil) notify:YES];
     } else if ([method isEqual:@"stopPush"]) { Fields(args,@[]); [client stopPushWithCompletion:result]; return;
     } else if ([method isEqual:@"resumePush"]) { Fields(args,@[]); [client resumePushWithCompletion:result]; return;
+    } else if ([method isEqual:@"setActiveNotificationContext"]) { Fields(args,@[@"id",@"category"]); [client setActiveNotificationContext:args error:&error];
+    } else if ([method isEqual:@"clearActiveNotificationContext"]) { Fields(args,@[]); [client clearActiveNotificationContext];
     } else if ([method isEqual:@"setBadge"]) { Fields(args,@[@"badge"]); if (!args[@"badge"]) @throw Invalid(@"badge is required"); [client setBadge:Integer(args,@"badge",0,0,INT_MAX) completion:result]; return;
     } else if ([method isEqual:@"clearNotifications"]) {
         Fields(args,@[@"androidIds",@"iosIdentifiers"]);
-        if (args[@"androidIds"]) for (id value in Array(args,@"androidIds")) Integer(@{@"id":value},@"id",0,0,INT_MAX);
+        if (args[@"androidIds"]) for (id value in Array(args,@"androidIds")) Integer(@{@"id":value},@"id",0,INT_MIN,INT_MAX);
         if (args[@"androidIds"] && !args[@"iosIdentifiers"]) { Send(completion,nil,BridgeError(@"unsupported",@"androidIds cannot select iOS notifications")); return; }
         if (args[@"iosIdentifiers"]) [client removeDeliveredNotificationsWithIdentifiers:Strings(args,@"iosIdentifiers",YES)]; else [client removeAllDeliveredNotifications];
     } else if ([method isEqual:@"createNotificationChannel"]) { error = BridgeError(@"unsupported",@"Notification channels require Android");

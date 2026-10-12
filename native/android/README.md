@@ -55,6 +55,8 @@ On subsequent application launches, read `push.getState().consentGranted` and in
 
 Configuration defaults: channel `default`, notification channel `avvessa` / `Notifications`, a white bell small icon, foreground presentation enabled, opening the launcher on click enabled, SDK debug logging disabled. `openApplicationOnClick(false)` records clicks without requesting launcher navigation.
 
+New default notification channels use `IMPORTANCE_HIGH`. Previously created channels keep their system settings; reinstall a test app or use a new channel ID when testing a different importance or sound.
+
 Opening the application restores its existing launcher task without clearing its pages. If no such task exists, Avvessa starts the application's declared launcher. This supports hosts whose launcher forwards to another Activity, including notification clicks that JPush has already used to start the host. Server-defined notification destinations are handled by JPush independently of Avvessa's launcher option.
 
 The SDK's auto-init provider is removed. Private providers restore saved consent in both the primary and `:pushcore` processes; they do not replace explicit initialization. Keep those providers, the SDK process name and Avvessa's receiver/service intact.
@@ -115,6 +117,26 @@ if (Build.VERSION.SDK_INT >= 26) {
 Package custom sounds as consumer resources. Channel sound/importance become system-managed after creation; a new value under the same ID does not override user settings. For Android 5–7, the SDK's notification alert settings control sound. `color(int)` takes an actual ARGB color, not a color resource ID.
 
 `presentInForeground(false)` asks the SDK not to display locally handled notifications while the app process is foreground. This is evaluated before local display. It cannot suppress a notification already rendered by a manufacturer's system service. A server-provided channel ID is used when that channel exists locally; otherwise the configured default is used.
+
+For selective suppression, pass a validated `NotificationPolicy` and optional `NotificationLifecycle` to the configuration builder:
+
+```java
+JSONObject rule = new JSONObject().put("activeContext", new JSONObject()
+    .put("match", new JSONObject().put("kind", "chat")).put("idField", "conversationId"));
+PushConfiguration configuration = new PushConfiguration.Builder(appKeyFromLocalConfiguration)
+    .presentationPolicy(new NotificationPolicy(rule))
+    .notificationLifecycle(new NotificationLifecycle(new JSONObject().put("clearBadgeOnOpen", true)))
+    .build();
+push.initialize(configuration);
+// Screen entry after initialization:
+push.setActiveNotificationContext(new JSONObject().put("id", "conversation-a"));
+// Screen leave, including a cached screen becoming hidden:
+push.clearActiveNotificationContext();
+```
+
+Constructing these JSON objects can throw `JSONException`; handle it alongside invalid configuration. Policy and lifecycle types are immutable copies. Suppression preserves a `notificationReceived` event with presentation metadata. An Application lifecycle observer handles background-to-foreground cleanup without treating Activity navigation as another entry. See the [shared policy contract](../../doc/contract.md#foreground-policy).
+
+Native channels also support `setVibrationPattern`, `enableLights`, `setLightColor` and `setShowBadge` before `createNotificationChannel`. Package bitmap icons under Android density directories or supply a vector drawable. For FCM defaults, the host can override `com.google.firebase.messaging.default_notification_icon` and `com.google.firebase.messaging.default_notification_color` resource metadata; the optional module otherwise uses the bundled icon.
 
 ## Optional manufacturer transports
 

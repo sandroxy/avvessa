@@ -45,6 +45,8 @@ export function clearPendingEvents(): Promise<void> { return invokeVoid(transpor
 export function stopPush(): Promise<void> { return invokeVoid(transport,'stopPush') }
 export function resumePush(): Promise<void> { return invokeVoid(transport,'resumePush') }
 export function setConsentGranted(granted: boolean): Promise<void> { return invokeVoid(transport,'setConsentGranted',{granted:granted}) }
+export function setActiveNotificationContext(context: UTSJSONObject): Promise<void> { return invokeVoid(transport,'setActiveNotificationContext',context) }
+export function clearActiveNotificationContext(): Promise<void> { return invokeVoid(transport,'clearActiveNotificationContext') }
 export function setBadge(badge: number): Promise<void> { return invokeVoid(transport,'setBadge',{badge:badge}) }
 export function setAlias(alias: string): Promise<UTSJSONObject> { return invokeObject(transport,'setAlias',{alias:alias}) }
 export function checkTag(tag: string): Promise<UTSJSONObject> { return invokeObject(transport,'checkTag',{tag:tag}) }

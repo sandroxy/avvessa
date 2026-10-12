@@ -32,6 +32,8 @@ UNNotificationPresentationOptions AVDefaultPresentationOptions(void) {
     if ((self = [super init])) {
         _appKey = [appKey copy]; _production = production; _channel = @"default";
         _foregroundPresentationOptions = AVDefaultPresentationOptions();
+        _presentationPolicy = [[AVNotificationPolicy alloc] initWithDictionary:@{} error:nil];
+        _notificationLifecycle = [[AVNotificationLifecycle alloc] initWithDictionary:@{} error:nil];
         _maxPendingEvents = 256; _eventRetention = 72 * 3600;
     }
     return self;
@@ -40,6 +42,7 @@ UNNotificationPresentationOptions AVDefaultPresentationOptions(void) {
     AVPushConfiguration *copy = [[[self class] allocWithZone:zone] initWithAppKey:self.appKey production:self.production];
     copy.channel = self.channel; copy.debug = self.debug;
     copy.foregroundPresentationOptions = self.foregroundPresentationOptions;
+    copy.presentationPolicy = self.presentationPolicy; copy.notificationLifecycle = self.notificationLifecycle;
     copy.maxPendingEvents = self.maxPendingEvents; copy.eventRetention = self.eventRetention;
     return copy;
 }
@@ -47,6 +50,7 @@ UNNotificationPresentationOptions AVDefaultPresentationOptions(void) {
     NSRegularExpression *pattern = [NSRegularExpression regularExpressionWithPattern:@"^[0-9a-fA-F]{24}$" options:0 error:nil];
     BOOL valid = self.appKey && [pattern numberOfMatchesInString:self.appKey options:0 range:NSMakeRange(0, self.appKey.length)] == 1
         && [self.channel stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet].length > 0
+        && [self.presentationPolicy isKindOfClass:AVNotificationPolicy.class] && [self.notificationLifecycle isKindOfClass:AVNotificationLifecycle.class]
         && self.maxPendingEvents >= 1 && self.maxPendingEvents <= 1000
         && isfinite(self.eventRetention) && self.eventRetention >= 60 && self.eventRetention <= 30 * 24 * 3600;
     if (!valid && error) *error = AVError(@"invalid_configuration", @"Invalid AppKey, channel or event retention", nil, nil);
@@ -54,6 +58,7 @@ UNNotificationPresentationOptions AVDefaultPresentationOptions(void) {
 }
 - (NSDictionary *)dictionary {
     return @{@"appKey": self.appKey, @"channel": self.channel, @"production": @(self.production), @"debug": @(self.debug),
+             @"presentationPolicy": self.presentationPolicy.dictionary, @"notificationLifecycle": self.notificationLifecycle.dictionary,
              @"presentation": @(self.foregroundPresentationOptions), @"maxEvents": @(self.maxPendingEvents), @"ttl": @(self.eventRetention)};
 }
 + (instancetype)fromDictionary:(NSDictionary *)dictionary error:(NSError **)error {
@@ -70,6 +75,9 @@ UNNotificationPresentationOptions AVDefaultPresentationOptions(void) {
     AVPushConfiguration *config = [[self alloc] initWithAppKey:dictionary[@"appKey"] production:[dictionary[@"production"] boolValue]];
     config.channel = dictionary[@"channel"]; config.debug = [dictionary[@"debug"] boolValue];
     config.foregroundPresentationOptions = [dictionary[@"presentation"] unsignedIntegerValue];
+    config.presentationPolicy = [[AVNotificationPolicy alloc] initWithDictionary:dictionary[@"presentationPolicy"] ?: @{} error:error];
+    config.notificationLifecycle = [[AVNotificationLifecycle alloc] initWithDictionary:dictionary[@"notificationLifecycle"] ?: @{} error:error];
+    if (!config.presentationPolicy || !config.notificationLifecycle) return nil;
     config.maxPendingEvents = [dictionary[@"maxEvents"] unsignedIntegerValue]; config.eventRetention = [dictionary[@"ttl"] doubleValue];
     return [config validateWithError:error] ? config : nil;
 }

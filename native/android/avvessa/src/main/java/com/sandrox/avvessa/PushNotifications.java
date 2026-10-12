@@ -27,7 +27,7 @@ final class PushNotifications {
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager.getNotificationChannel(config.notificationChannelId) == null)
                 manager.createNotificationChannel(new NotificationChannel(config.notificationChannelId,
-                        config.notificationChannelName, NotificationManager.IMPORTANCE_DEFAULT));
+                        config.notificationChannelName, NotificationManager.IMPORTANCE_HIGH));
         }
     }
     static Notification build(Context context, PushConfiguration config, NotificationMessage message) {

@@ -41,8 +41,9 @@ import UserNotifications
 
 let push = AVPushClient.shared
 
-// Use this assignment only when the application has no other notification delegate.
-UNUserNotificationCenter.current().delegate = push
+let center = UNUserNotificationCenter.current()
+if let existing = center.delegate { push.notificationDelegate.addDelegate(existing) }
+center.delegate = push.notificationDelegate
 
 // Call this grant only from the application's explicit consent flow.
 try push.setConsentGranted(true)
@@ -100,13 +101,17 @@ Initialization queries existing settings and registers with APNs if permission w
 
 ## Cooperate with an existing notification delegate
 
-Avvessa does not replace or swizzle delegates. If the host already has a `UNUserNotificationCenterDelegate`, retain it and forward JPush notifications using:
+The native core does not install or swizzle delegates. Explicitly install `push.notificationDelegate` as above and retain each observing delegate in its owning feature. `addDelegate` and `removeDelegate` manage weak observers. The coordinator completes each system callback once, ignores recursive forwarding of the same notification, and reports `notification_delegate_timeout` if a delegate fails to finish within two seconds.
+
+For owned JPush notifications, Avvessa's presentation decision is authoritative. Observers receive permitted foreground notifications and response callbacks but cannot change presentation through their completion result. Suppressed foreground notifications are not forwarded to other SDK delegates that might display them again; consume their Avvessa receipt events instead. Unowned notifications are forwarded to the observers and their presentation options combined. With no interested observer, the coordinator requests no foreground presentation for an unowned notification.
+
+Alternatively, keep a host-owned `UNUserNotificationCenterDelegate` and forward JPush notifications using:
 
 - `canHandleRemoteNotification(_:)`
 - `handleForegroundNotification(_:)`, which returns presentation options
 - `handleNotificationResponse(_:)`
 
-`canHandleRemoteNotification` recognizes the documented JPush `_j_msgid` marker. Forwarding ignores notifications without it. When assigned as the sole delegate, unrelated foreground notifications receive standard system presentation options and are not persisted by Avvessa.
+`canHandleRemoteNotification` recognizes the documented JPush `_j_msgid` marker. Forwarding ignores notifications without it. Assigning the client directly remains possible for a sole-delegate host; use the coordinator when sharing notification ownership.
 
 The host owns each system completion handler and must invoke it exactly once. If the host delegate receives a callback off the main thread, dispatch the Avvessa call to the main thread first. Route notifications owned by other components to their own handlers.
 
@@ -131,6 +136,21 @@ A click response is persisted as `notificationOpened`; dismiss actions use `noti
 ## Presentation and notification controls
 
 `foregroundPresentationOptions` configures native foreground presentation before delivery to observers. The default requests alert/sound/badge on iOS 13 and list/banner/sound/badge on newer systems. An empty option set suppresses foreground presentation for owned notifications.
+
+Configure selective rules and cleanup before initialization, then update context as the host screen changes:
+
+```swift
+configuration.presentationPolicy = try AVNotificationPolicy(dictionary: [
+    "activeContext": ["match": ["kind": "chat"], "idField": "conversationId"]
+])
+configuration.notificationLifecycle = try AVNotificationLifecycle(dictionary: ["clearBadgeOnOpen": true])
+// After initialization, on entering the relevant screen:
+try push.setActiveNotificationContext(["id": "conversation-a"])
+// On leaving or hiding it:
+push.clearActiveNotificationContext()
+```
+
+Rules suppress the foreground banner and sound while preserving receipt events and the configured badge option. Context is transient. All lifecycle cleanup options are opt-in. See the [shared policy contract](../../doc/contract.md#foreground-policy) for limits and foreground/background semantics.
 
 Notification icons use the application's iOS app icon. Include custom sounds in the host app bundle and request their file names in the APNs payload. Categories registered through `setNotificationCategories` are merged by identifier with existing system categories; a host category using the same identifier is replaced.
 

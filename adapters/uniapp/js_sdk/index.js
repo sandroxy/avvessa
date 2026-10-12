@@ -11,5 +11,6 @@ export const {
   getState, getCapabilities, initialize, setConsentGranted, refreshState, requestNotificationPermission,
   openNotificationSettings, getPendingEvents, acknowledge, clearPendingEvents, subscribe, unsubscribe,
   stopPush, resumePush, setBadge, clearNotifications, createNotificationChannel, setNotificationCategories,
+  setActiveNotificationContext, clearActiveNotificationContext,
   setAlias, getAlias, deleteAlias, setTags, addTags, deleteTags, getTags, clearTags, checkTag,
 } = api;

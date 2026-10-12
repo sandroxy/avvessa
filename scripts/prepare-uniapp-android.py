@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import struct
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -17,6 +18,44 @@ PARAMETERS={'xiaomi':['XIAOMI_APPID','XIAOMI_APPKEY'],'oppo':['OPPO_APPID','OPPO
             'meizu':['MEIZU_APPID','MEIZU_APPKEY'],'vivo':['VIVO_APPID','VIVO_APPKEY'],'honor':['HONOR_APPID'],'huawei':[],'fcm':[]}
 METADATA={'VIVO_APPID':'com.vivo.push.app_id','VIVO_APPKEY':'com.vivo.push.api_key','HONOR_APPID':'com.hihonor.push.app_id'}
 
+
+def notification_icons(source):
+    """Return validated consumer resources without modifying the supplied artwork."""
+    source = Path(source)
+    def png(path):
+        data = path.read_bytes()
+        if len(data) < 33 or data[:8] != b'\x89PNG\r\n\x1a\n' or data[12:16] != b'IHDR':
+            raise SystemExit('Notification PNG is invalid')
+        width, height = struct.unpack('>II', data[16:24])
+        if not width or width != height or width > 1024:
+            raise SystemExit('Notification PNG must be square and no larger than 1024 pixels')
+        return data
+    if source.is_dir():
+        resources = {}
+        for density, size in {'mdpi':24,'hdpi':36,'xhdpi':48,'xxhdpi':72,'xxxhdpi':96}.items():
+            path = source / (density + '.png')
+            data = png(path)
+            if struct.unpack('>II',data[16:24]) != (size,size): raise SystemExit(f'{density}.png must be {size}x{size}')
+            resources[f'drawable-{density}/avvessa_consumer_notification.png'] = data
+        if {p.name for p in source.iterdir()} != {d+'.png' for d in ('mdpi','hdpi','xhdpi','xxhdpi','xxxhdpi')}:
+            raise SystemExit('Icon directory must contain exactly the five density PNG files')
+        return resources
+    if source.suffix == '.png': return {'drawable-nodpi/avvessa_consumer_notification.png':png(source)}
+    if source.suffix != '.xml' or ET.parse(source).getroot().tag != 'vector': raise SystemExit('Notification icon must be a vector XML, PNG, or density directory')
+    return {'drawable/avvessa_consumer_notification.xml':source.read_bytes()}
+
+
+def permission_overlay(core, retained):
+    removed = {item.get(f'{{{ANDROID}}}name') for item in core.findall('uses-permission') if item.get(f'{{{TOOLS}}}node') == 'remove'}
+    if not isinstance(retained,list) or any(not isinstance(item,str) for item in retained) or len(retained) != len(set(retained)) or set(retained)-removed:
+        raise SystemExit('retainedPermissions must contain unique permissions otherwise removed by Avvessa')
+    output=[]
+    for permission in core.findall('uses-permission'):
+        item=copy.deepcopy(permission)
+        if item.get(f'{{{ANDROID}}}name') in retained: item.set(f'{{{TOOLS}}}node','merge')
+        output.append(item)
+    return output
+
 def prepare(args):
     data=json.loads(args.config.read_text())
     android=data['android']
@@ -26,6 +65,12 @@ def prepare(args):
     if len(set(vendors))!=len(vendors) or set(vendors)-set(PARAMETERS): raise SystemExit('Unknown or duplicate vendor modules')
     expected={key for vendor in vendors for key in PARAMETERS[vendor]}
     if set(properties)!=expected or any(not isinstance(v,str) or not v.strip() for v in properties.values()): raise SystemExit('Vendor properties differ from selected modules')
+    core_manifest=ET.parse(ROOT/'native/android/avvessa/src/main/AndroidManifest.xml').getroot()
+    permissions=permission_overlay(core_manifest,android.get('retainedPermissions',[]))
+    icon=args.small_icon.resolve() if args.small_icon else ROOT/'native/android/avvessa/src/main/res/drawable/avvessa_notification.xml'
+    icons=notification_icons(icon)
+    color=getattr(args,'notification_color',None)
+    if color is not None and not re.fullmatch(r'#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?',color): raise SystemExit('notification color must be #RRGGBB or #AARRGGBB')
     work=args.output.resolve()
     if work==ROOT or ROOT not in work.parents or subprocess.run(['git','check-ignore','-q',str(work)],cwd=ROOT).returncode: raise SystemExit('Output must be inside an ignored product build directory')
     work.mkdir(parents=True,exist_ok=True)
@@ -62,14 +107,17 @@ def prepare(args):
         config=json.loads(Path(android['agconnectServicesFile']).read_text())
         ET.SubElement(strings,'string',{'name':'avvessa_huawei_app_id','translatable':'false'}).text=resource_string('appid='+str(config['client']['app_id']))
         ET.SubElement(app,'meta-data',{f'{{{ANDROID}}}name':'com.huawei.hms.client.appid',f'{{{ANDROID}}}value':'@string/avvessa_huawei_app_id',f'{{{TOOLS}}}replace':'android:value'})
+    if 'fcm' in vendors:
+        ET.SubElement(app,'meta-data',{f'{{{ANDROID}}}name':'com.google.firebase.messaging.default_notification_icon',f'{{{ANDROID}}}resource':'@drawable/avvessa_consumer_notification',f'{{{TOOLS}}}replace':'android:resource'})
+        if color:
+            ET.SubElement(strings,'color',{'name':'avvessa_consumer_notification_color'}).text=color
+            ET.SubElement(app,'meta-data',{f'{{{ANDROID}}}name':'com.google.firebase.messaging.default_notification_color',f'{{{ANDROID}}}resource':'@color/avvessa_consumer_notification_color'})
     write('configuration/src/main/AndroidManifest.xml',ET.tostring(manifest,encoding='unicode'))
     write('configuration/src/main/res/values/avvessa.xml',ET.tostring(strings,encoding='unicode'))
     # Local AARs have no reliable priority relative to the vendor AARs. Apply merge rules at
     # the consuming application's priority instead of modifying official SDK artifacts.
     host_manifest=ET.Element('manifest',{'package':identity})
-    core_manifest=ET.parse(ROOT/'native/android/avvessa/src/main/AndroidManifest.xml').getroot()
-    for permission in core_manifest.findall('uses-permission'):
-        host_manifest.append(copy.deepcopy(permission))
+    for permission in permissions: host_manifest.append(permission)
     host_app=ET.SubElement(host_manifest,'application')
     for entry in core_manifest.find('application'):
         if entry.tag=='meta-data' or entry.get(f'{{{TOOLS}}}node')=='remove':
@@ -78,8 +126,10 @@ def prepare(args):
         host_app.append(copy.deepcopy(entry))
     ET.indent(host_manifest)
     write('AndroidManifest.xml',ET.tostring(host_manifest,encoding='unicode')+'\n')
-    icon=args.small_icon.resolve() if args.small_icon else ROOT/'native/android/avvessa/src/main/res/drawable/avvessa_notification.xml'
-    write('configuration/src/main/res/drawable/avvessa_consumer_notification.xml',icon.read_text())
+    resources_root=work/'configuration/src/main/res'
+    for old in resources_root.glob('drawable*/avvessa_consumer_notification.*'): old.unlink()
+    for relative,content in icons.items():
+        target=resources_root/relative;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(content);target.chmod(0o600)
     subprocess.run([str(ROOT/'native/android/gradlew'),'-p',str(work),':configuration:assembleRelease','--console=plain'],check=True)
     print(work/'configuration/build/outputs/aar/configuration-release.aar')
     print(work/'AndroidManifest.xml')
@@ -87,6 +137,7 @@ def prepare(args):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config',type=Path,required=True,help='Local JSON with android.applicationId, vendorModules, vendorProperties and service file paths')
-    parser.add_argument('--small-icon',type=Path,help='Optional consumer Android vector drawable XML')
+    parser.add_argument('--small-icon',type=Path,help='Consumer vector XML, square PNG, or directory with mdpi.png through xxxhdpi.png')
+    parser.add_argument('--notification-color',help='Optional FCM default tint, #RRGGBB or #AARRGGBB')
     parser.add_argument('--output',type=Path,default=ROOT/'.build/uniapp-consumer')
     prepare(parser.parse_args())

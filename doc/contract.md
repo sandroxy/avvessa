@@ -40,10 +40,12 @@ Removing an observer only removes that observer. It does not stop the process-wi
 | `data` | Uninterpreted extras dictionary; null if malformed extras were reported |
 | `raw` | Native SDK payload snapshot |
 | `replayed` | Whether this delivery came from pending storage |
+| `presentation` | Where a local presentation decision is observed: `{suppressed, reason}`; absent for callbacks without that decision |
+| `notificationId` | Android system notification ID for notification events; may be negative |
 
 iOS also includes `transportId` when a notification request ID is available and `action` for responses. Action metadata has `identifier` and, for a text response, `userText`; it does not overwrite payload keys.
 
-Normal event types are `notificationReceived`, `notificationOpened`, `notificationDismissed` and `customMessage`. Android can additionally report `notificationSuppressed` and the SDK's raw `voipMessage` transport event. The latter does not provide incoming-call handling, UI, CallKit or PushKit.
+Normal event types are `notificationReceived`, `notificationOpened`, `notificationDismissed` and `customMessage`. A suppressed foreground notification remains `notificationReceived` with `presentation.suppressed: true`; it is not discarded or converted into a custom message. Android can additionally report the SDK's raw `voipMessage` transport event. That event does not provide incoming-call handling, UI, CallKit or PushKit.
 
 On Android, `raw` snapshots the pinned SDK message object's public JSON-compatible fields; it is not the original HTTP request or an Android Context/Parcelable serialization. The extras string is retained verbatim. On iOS, `raw` is the SDK's userInfo dictionary. Malformed extras produce `invalid_payload` without removing the original extras from `raw`. Payloads that cannot be encoded as JSON are rejected explicitly.
 
@@ -66,13 +68,45 @@ Defaults and limits:
 
 Count, byte and age eviction removes the oldest applicable events and increments `droppedEvents`. Oversized events fail with `event_too_large`. Storage overhead is additional to the encoded payload limit.
 
-Deduplication uses phase, source and a supplied message identity. iOS can use a notification request ID when supplied. Action identifiers distinguish iOS responses. Matching text is never an identity. Receive and open are distinct events; a missing reliable ID does not cause content-based deduplication.
+Deduplication uses phase and the supplied message identity across transport callbacks. Android system notification IDs and iOS request IDs form fallback aliases, including when the SDK message ID appears in a later callback. Reusing a system ID with a different known message ID remains a new event. Action identifiers distinguish iOS responses. Matching text is never an identity. Receive and open are distinct events; a callback with no identity is not deduplicated by content. A fallback ID alone cannot distinguish two unidentified messages deliberately reusing that ID within the deduplication window.
 
-Acknowledgement removes a pending event but retains its short-lived deduplication identity. It is not a server receipt. If a process exits after business handling but before acknowledgement, replay is expected; the application must make its own side effects idempotent. Already queued callbacks may still run after acknowledgement.
+Acknowledgement and clearing pending events retain short-lived deduplication identities. Neither is a server receipt. If a process exits after business handling but before acknowledgement, replay is expected; the application must make its own side effects idempotent. Already queued callbacks may still run after acknowledgement.
 
 Revoking consent clears pending events and RegistrationID and cancels pending SDK command callbacks. Previously scheduled event callbacks cannot reappear after a revoke/regrant cycle. It does not remotely retract a push already handed to APNs or a manufacturer, or erase all data held internally by the SDK.
 
 ## Notifications and platform limits
+
+### Foreground policy
+
+`presentationPolicy` is an immutable initialization option shared by both native cores and all UNI entry points:
+
+```json
+{
+  "suppressForeground": [
+    {"match": {"kind": "quiet"}, "reason": "quietMessage"}
+  ],
+  "activeContext": {
+    "match": {"kind": "chat"},
+    "idField": "conversationId",
+    "categoryField": "conversationType",
+    "reason": "activeConversation"
+  }
+}
+```
+
+These field names and values are examples supplied by the application. Rules read top-level `event.data` fields, never guess aliases or parse nested strings. Every `match` field must match. Optional `platforms` limits a rule to `android` and/or `ios`. Static suppression is evaluated first, then the active-context rule. Missing fields or missing context allow presentation. A global foreground-disable option takes precedence over rules.
+
+`setActiveNotificationContext({id, category})` requires consent and initialization. `clearActiveNotificationContext()` is safe before initialization. Context is copied into process memory; it does not survive process death or consent withdrawal. It is not tied to a subscription. The host must clear it when leaving the relevant screen, including cached-page hide events, and set it again when that screen becomes active. Background notifications are not suppressed by these rules. Runtime context changes affect subsequent decisions, not a notification already being displayed.
+
+Scalar comparisons use canonical text: `1` matches `"1"`, while `"01"` does not. Booleans use `"true"`/`"false"`; null, objects and arrays do not match. Numeric magnitude is limited to JavaScript's safe integer boundary; send long identifiers as strings. Each rule accepts 1–32 match fields, up to 32 static rules, field names and reasons of 1–128 characters, and scalar strings of up to 1,024 characters. Unknown configuration fields fail explicitly.
+
+Default suppression reasons are `rule`, `activeContext` and `foregroundDisabled`; rules can supply their own reason. Android may report `sdk` for a notification suppressed by the SDK without an Avvessa decision. Allowed local presentation reports `{suppressed:false, reason:null}`. This is the application's decision, not proof that the OS actually displayed a banner. On iOS, rules remove visible presentation and sound while retaining the configured badge option. Payload and acknowledgement semantics remain unchanged.
+
+### Optional lifecycle cleanup
+
+`notificationLifecycle` accepts five independent booleans, all false by default: `clearBadgeOnStart`, `clearBadgeOnForeground`, `clearBadgeOnOpen`, `clearDeliveredOnStart`, `clearDeliveredOnForeground`. Start means the first successful initialization in the current process. Foreground means a return from background, not navigation between screens. Open means a newly captured notification-open event; a cold-start open can defer badge cleanup until initialization. Replay alone does not repeat cleanup.
+
+Badge cleanup uses the native badge API, including JPush badge state on iOS. Delivered cleanup removes all of this application's delivered notifications, including notifications from other components. Enable only the operations the host owns. Cleanup does not acknowledge pending events or clear the active context. SDK failures are reported through error observations. These options never grant consent or request notification authorization.
 
 Android's local small icon and foreground policy apply to notifications constructed inside the app. Factory-managed system notifications may use manufacturer resources, categories and cloud settings. Android channel importance and sound are controlled by the system after channel creation; recreating the same ID does not reset the user's settings.
 

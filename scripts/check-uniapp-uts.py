@@ -38,7 +38,8 @@ def check(args):
             if out.exists(): shutil.rmtree(out)
             out.mkdir()
             env = os.environ | {'UNI_INPUT_DIR':str(work/'input'),'UNI_OUTPUT_DIR':str(out),'UNI_UTS_PLATFORM':'app-'+platform,
-                                'UNI_APP_X':'true' if runtime=='x' else 'false','NODE_ENV':'production'}
+                                'UNI_APP_X':'true' if runtime=='x' else 'false','NODE_ENV':'production',
+                                'UNI_APP_X_DOM2':'true' if runtime=='x' and args.x_renderer=='vapor' else 'false'}
             run([node,'-e',js,compiler,module,'true' if runtime=='x' else 'false'],env=env)
         android = work/f'{runtime}-android/uni_modules/Sandrox-Avvessa/utssdk/app-android'
         extracted = work/f'{runtime}-classes'
@@ -46,7 +47,10 @@ def check(args):
         jars = list(classic_libs.glob('*.jar')) if runtime=='classic' else [classic_libs/name for name in
             ('android_36.jar','kotlin-stdlib-2.2.0.jar','kotlinx-coroutines-core-jvm-1.6.4.jar')]
         archives = list((android/'libs').glob('*.aar'))
-        if runtime=='x': archives += [x_libs/name for name in ('app-common-release.aar','app-runtime-release.aar','framework-release.aar','uts-runtime-release.aar')]
+        if runtime=='x':
+            archives += [x_libs/name for name in ('app-common-release.aar','app-runtime-release.aar','uts-runtime-release.aar')]
+            # The native renderer needs its framework archive; Vapor uses app-common/app-runtime.
+            if args.x_renderer=='native': archives.append(x_libs/'framework-release.aar')
         for aar in archives:
             with zipfile.ZipFile(aar) as archive:
                 if 'classes.jar' in archive.namelist():
@@ -70,5 +74,6 @@ if __name__=='__main__':
     parser.add_argument('--classic-ios-sdk',type=Path,required=True)
     parser.add_argument('--x-android-sdk',type=Path,required=True)
     parser.add_argument('--x-ios-sdk',type=Path,required=True)
+    parser.add_argument('--x-renderer',choices=('native','vapor'),default='native',help='Match the supplied uni-app x SDK and consumer renderer')
     parser.add_argument('--output',type=Path,default=ROOT/'.build/uniapp/compiler')
     check(parser.parse_args())
