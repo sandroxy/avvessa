@@ -40,7 +40,7 @@ Removing an observer only removes that observer. It does not stop the process-wi
 | `data` | Uninterpreted extras dictionary; null if malformed extras were reported |
 | `raw` | Native SDK payload snapshot |
 | `replayed` | Whether this delivery came from pending storage |
-| `presentation` | Where a local presentation decision is observed: `{suppressed, reason}`; absent for callbacks without that decision |
+| `presentation` | Where a local presentation decision is observed: `{suppressed, reason, method?}`; absent for callbacks without that decision |
 | `notificationId` | Android system notification ID for notification events; may be negative |
 
 iOS also includes `transportId` when a notification request ID is available and `action` for responses. Action metadata has `identifier` and, for a text response, `userText`; it does not overwrite payload keys.
@@ -102,6 +102,13 @@ Scalar comparisons use canonical text: `1` matches `"1"`, while `"01"` does not.
 
 Default suppression reasons are `rule`, `activeContext` and `foregroundDisabled`; rules can supply their own reason. Android may report `sdk` for a notification suppressed by the SDK without an Avvessa decision. Allowed local presentation reports `{suppressed:false, reason:null}`. This is the application's decision, not proof that the OS actually displayed a banner. On iOS, rules remove visible presentation and sound while retaining the configured badge option. Payload and acknowledgement semantics remain unchanged.
 
+Android reports an additional `presentation.method` when suppressed:
+
+- `blocked`: the SDK skipped posting the notification. JPush 6.2.1 invokes its custom pre-display gate when the sender explicitly includes `notification.android.display_foreground: "1"`. The value `"0"` instead applies the SDK's own foreground suppression.
+- `silentRemoval`: the SDK bypassed that gate, as it does for ordinary payloads without `display_foreground`. Avvessa applies AndroidX per-notification silence before posting, then removes that notification in the SDK receipt/display callback. This prevents the notification from alerting on compliant Android implementations; a short-lived silent entry may still reach notification history or system notification listeners. It is not a guarantee that no notification was ever posted. The removal is independent of optional lifecycle cleanup.
+
+The normal console payload needs no extra field. Both paths preserve the same receipt and freeze the decision before a subsequent page change. A private application-process provider supplies the active context to SDK service-process builders; it does not persist the context or initialize JPush. Custom manufacturer rendering still requires device verification. Notifications displayed entirely by a manufacturer's service do not pass through this local builder. See [AndroidX notification silence](https://developer.android.com/reference/androidx/core/app/NotificationCompat.Builder#setSilent(boolean)) and [JPush payload options](https://docs.jiguang.cn/jpush/server/push/rest_api_v3_push).
+
 ### Optional lifecycle cleanup
 
 `notificationLifecycle` accepts five independent booleans, all false by default: `clearBadgeOnStart`, `clearBadgeOnForeground`, `clearBadgeOnOpen`, `clearDeliveredOnStart`, `clearDeliveredOnForeground`. Start means the first successful initialization in the current process. Foreground means a return from background, not navigation between screens. Open means a newly captured notification-open event; a cold-start open can defer badge cleanup until initialization. Replay alone does not repeat cleanup.
@@ -109,6 +116,8 @@ Default suppression reasons are `rule`, `activeContext` and `foregroundDisabled`
 Badge cleanup uses the native badge API, including JPush badge state on iOS. Delivered cleanup removes all of this application's delivered notifications, including notifications from other components. Enable only the operations the host owns. Cleanup does not acknowledge pending events or clear the active context. SDK failures are reported through error observations. These options never grant consent or request notification authorization.
 
 Android's local small icon and foreground policy apply to notifications constructed inside the app. Factory-managed system notifications may use manufacturer resources, categories and cloud settings. Android channel importance and sound are controlled by the system after channel creation; recreating the same ID does not reset the user's settings.
+
+A configured small icon does not force the notification shade to use that image: some system styles, including MIUI, display the application icon there. Check the notification's actual small-icon resource as well as its appearance. See [Jiguang's icon configuration guidance](https://docs.jiguang.cn/jpush/practice/set_icon).
 
 The Android core includes a default `jpush_notification_icon` resource for the SDK's initial notification construction, including hosts without an application icon. The configured `smallIcon` is then applied by Avvessa's notification builder. A host can override the default drawable resource.
 

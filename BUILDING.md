@@ -15,6 +15,8 @@ cd native/android
 
 The tests run with SDK startup components excluded and do not initialize JPush. They cover persistence, acknowledgement, cross-callback identity aliases, reused notification IDs, unidentified messages, eviction, concurrent creation, privacy withdrawal, receipt preservation during suppression, and foreground transition boundaries. Android and iOS policy tests consume the same JSON fixtures.
 
+The Android dispatch regression also calls the pinned JPush notification dispatcher with JCore network operations replaced by a test shadow. It checks ordinary payloads that omit `display_foreground`, the explicit pre-display gate, silence before posting, removal, context changes and the application-provider boundary. The fixture's SDK-internal entry points are test-only and must be reviewed when updating JPush. These checks cannot validate a manufacturer's notification UI.
+
 The checked-in Gradle wrapper and Android Gradle Plugin form the supported local build baseline. The official JPush and some vendor jars emit R8 stack-map warnings with this toolchain. Do not hide those warnings or treat compilation as device validation; verify release builds when changing the SDK or shrinker.
 
 ## iOS

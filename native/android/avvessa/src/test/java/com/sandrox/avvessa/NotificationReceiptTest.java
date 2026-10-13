@@ -27,6 +27,7 @@ public class NotificationReceiptTest {
     private final AvvessaReceiver receiver = new AvvessaReceiver();
     @Before public void setUp() {
         context = RuntimeEnvironment.getApplication(); ProcessShadow.foreground = true;
+        context.getApplicationInfo().processName = Application.getProcessName();
         config = new PushConfiguration.Builder("000000000000000000000000").smallIcon(android.R.drawable.ic_dialog_info)
                 .presentationPolicy(new NotificationPolicy(Json.parse("{\"activeContext\":{\"match\":{\"kind\":\"chat\"},\"idField\":\"conversationId\"}}"))).build();
         store = new EventStore(context); store.state("configuration", config.toJson(context).toString()); store.state("consent", "true");
@@ -36,6 +37,7 @@ public class NotificationReceiptTest {
         client.setActiveNotificationContext(Json.parse("{\"id\":\"a\"}"));
     }
     @After public void tearDown() {
+        AvvessaPresentationProvider.clear();
         ((EventStore) ReflectionHelpers.getField(client, "store")).close(); store.close();
         ReflectionHelpers.setStaticField(Avvessa.class,"shared",null);
     }

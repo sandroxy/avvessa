@@ -65,7 +65,7 @@ export interface PushEvent {
   data: JsonObject | null;
   raw: JsonObject;
   replayed: boolean;
-  presentation?: { suppressed: boolean; reason: string | null } | null;
+  presentation?: { suppressed: boolean; reason: string | null; method?: 'blocked' | 'silentRemoval' } | null;
   notificationId?: number;
   transportId?: string | null;
   action?: { identifier: string; userText?: string } | null;

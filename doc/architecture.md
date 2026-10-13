@@ -19,13 +19,15 @@ The Android implementation uses Java and the iOS implementation uses Objective-C
 
 The core owns initialization, native callback capture, notification defaults, event persistence and SDK operation correlation. Applications own their consent decision, server configuration, application signing, payload meaning, login, account association and navigation. A notification click can open the Android launcher; it cannot select a business screen.
 
-Presentation rules compare explicit payload fields. The application supplies the current context and clears it when leaving that context. The core does not know conversations, participants, customer service pages or routes. Rules run before local system presentation and preserve the notification receipt, so applications can update visible content without a second banner.
+Presentation rules compare explicit payload fields. The application supplies the current context and clears it when leaving that context. The core does not know conversations, participants, customer service pages or routes. Rules preserve the receipt while controlling local presentation. Android uses the SDK's pre-display gate where available; other locally built notifications are made silent before posting and removed on the receipt/display callback. The event distinguishes these two mechanisms; see the [presentation contract](contract.md#foreground-policy).
 
 Incoming-call handling is outside this package: PushKit delivery obligations, CallKit/Android call UI, accept/reject/timeout state and media sessions form a separate calling component. That component can compose ordinary push events and presentation rules, but Avvessa does not turn a data message into a call or claim call delivery guarantees. Android's raw SDK `voipMessage` event is payload transport only.
 
 ## Android
 
 `Avvessa` is process-scoped. Initialize it in the application process. The SDK service runs in `:pushcore`; private providers restore consent before SDK components and synchronize later consent changes. The SDK's automatic initialization provider and SDK-owned optional location, phone-state, package-query and storage permissions are removed by manifest merge rules.
+
+A separate private presentation provider owns short-lived in-memory decisions in the application process. SDK builders in another process query that provider instead of reading a separate copy of the current page context. Decisions follow the SDK message ID because the SDK may assign the final notification ID only after construction. Silenced notifications carry an instance token so removal on Android 6 and later does not cancel a newer notification that reused the same ID.
 
 SQLite transactions coordinate persistent state, deduplication and queue limits across processes. Native receivers can record messages before a UI or framework subscriber exists. Locally rendered notifications use a direct PendingIntent Activity for click handling. Factory-managed notifications continue through the SDK's own entry points.
 

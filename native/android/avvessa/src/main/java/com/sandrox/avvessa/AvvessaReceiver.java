@@ -11,44 +11,36 @@ import cn.jpush.android.service.JPushMessageReceiver;
 import org.json.JSONObject;
 
 public final class AvvessaReceiver extends JPushMessageReceiver {
-    private static final java.util.Map<String, Decision> decisions = new java.util.LinkedHashMap<>();
-    private static String identity(NotificationMessage message) { return message.platform + ":" + message.msgId + ":" + message.notificationId; }
-    private static synchronized void remember(NotificationMessage message, String reason) {
-        long now = android.os.SystemClock.elapsedRealtime();
-        java.util.Iterator<Decision> iterator = decisions.values().iterator();
-        while (iterator.hasNext()) if (now - iterator.next().time > 60000) iterator.remove();
-        if (decisions.size() >= 256) decisions.remove(decisions.keySet().iterator().next());
-        decisions.put(identity(message), new Decision(reason, now));
-    }
-    private static synchronized String takeReason(NotificationMessage message) {
-        Decision decision = decisions.remove(identity(message));
-        return decision != null && android.os.SystemClock.elapsedRealtime() - decision.time <= 60000 ? decision.reason : "sdk";
-    }
-    private static final class Decision {
-        final String reason; final long time;
-        Decision(String reason, long time) { this.reason = reason; this.time = time; }
-    }
     @Override public boolean isNeedShowNotification(Context context, NotificationMessage message, String source) {
         Avvessa client = Avvessa.getInstance(context);
         if (!client.mayReceive()) return false;
-        String reason = client.suppressionReason(PushPayloads.extras(client, message.notificationExtras), PushNotifications.foreground());
-        if (reason != null) {
-            // Freeze the decision before the page/context can change; the SDK then calls onNotifyMessageUnShow.
-            remember(message, reason);
+        try { return AvvessaPresentationProvider.select(context, message, AvvessaPresentationProvider.BLOCKED).reason == null; }
+        catch (RuntimeException error) {
+            client.report(new PushException("notification_presentation", "Cannot select notification presentation", error));
+            return true;
         }
-        return reason == null;
     }
     @Override public Notification getNotification(Context context, NotificationMessage message) {
         Avvessa client = Avvessa.getInstance(context);
         if (!client.mayReceive()) return null;
-        try { return PushNotifications.build(context, client.configuration(), message); }
+        try {
+            AvvessaPresentationProvider.Decision decision = AvvessaPresentationProvider.select(context, message, AvvessaPresentationProvider.SILENT_REMOVAL);
+            Notification notification = PushNotifications.build(context, client.configuration(), message);
+            return decision.reason == null ? notification : PushNotifications.silence(context, notification, decision.token);
+        }
         catch (RuntimeException error) {
+            try { AvvessaPresentationProvider.take(context, message); }
+            catch (RuntimeException cleanupError) { error.addSuppressed(cleanupError); }
             client.report(new PushException("notification_build", "Cannot build notification", error));
             return null;
         }
     }
     @Override public void onNotifyMessageArrived(Context context, NotificationMessage message) {
-        notification(context, "notificationReceived", message);
+        receipt(context, message, false, false);
+    }
+    @Override public void onNotifyMessageShow(Context context, NotificationMessage message) {
+        // Some SDK notification styles report only SHOW. Repeated ARRIVED/SHOW is one receipt.
+        receipt(context, message, false, true);
     }
     @Override public void onNotifyMessageOpened(Context context, NotificationMessage message) {
         Avvessa client = Avvessa.getInstance(context);
@@ -62,14 +54,25 @@ public final class AvvessaReceiver extends JPushMessageReceiver {
         notification(context, "notificationDismissed", message);
     }
     @Override public void onNotifyMessageUnShow(Context context, NotificationMessage message) {
-        PushPayloads.receiveNotification(Avvessa.getInstance(context), "notificationReceived", PushPayloads.notification(message), presentation(true, takeReason(message)));
+        receipt(context, message, true, false);
     }
-    private static JSONObject presentation(boolean suppressed, String reason) {
-        JSONObject result = new JSONObject(); Json.put(result, "suppressed", suppressed); Json.put(result, "reason", reason); return result;
+    private void receipt(Context context, NotificationMessage message, boolean sdkSuppressed, boolean onlySelected) {
+        Avvessa client = Avvessa.getInstance(context);
+        AvvessaPresentationProvider.Decision decision = null;
+        try { decision = AvvessaPresentationProvider.take(context, message); }
+        catch (RuntimeException error) { client.report(new PushException("notification_presentation", "Cannot read notification presentation", error)); }
+        if (onlySelected && decision == null) return;
+        if (decision != null && AvvessaPresentationProvider.SILENT_REMOVAL.equals(decision.method)) {
+            try { PushNotifications.removeSilenced(context, message.notificationId, decision.token); }
+            catch (RuntimeException error) { client.report(new PushException("notification_remove", "Cannot remove silenced notification", error)); }
+        }
+        String reason = decision == null || decision.reason == null ? (sdkSuppressed ? "sdk" : null) : decision.reason;
+        JSONObject presentation = new JSONObject(); Json.put(presentation, "suppressed", reason != null); Json.put(presentation, "reason", reason);
+        if (reason != null) Json.put(presentation, "method", sdkSuppressed ? AvvessaPresentationProvider.BLOCKED : decision.method);
+        PushPayloads.receiveNotification(client, "notificationReceived", PushPayloads.notification(message), presentation);
     }
     private void notification(Context context, String type, NotificationMessage message) {
-        PushPayloads.receiveNotification(Avvessa.getInstance(context), type, PushPayloads.notification(message),
-                type.equals("notificationReceived") ? presentation(false, null) : null);
+        PushPayloads.receiveNotification(Avvessa.getInstance(context), type, PushPayloads.notification(message));
     }
     @Override public void onMessage(Context context, CustomMessage message) {
         Avvessa client = Avvessa.getInstance(context);

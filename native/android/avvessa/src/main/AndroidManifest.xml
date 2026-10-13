@@ -16,6 +16,9 @@
         <provider android:name="com.sandrox.avvessa.AvvessaPrivacyProvider"
             android:authorities="${applicationId}.avvessa.privacy"
             android:exported="false" android:initOrder="1000" />
+        <provider android:name="com.sandrox.avvessa.AvvessaPresentationProvider"
+            android:authorities="${applicationId}.avvessa.presentation"
+            android:exported="false" />
         <provider android:name="com.sandrox.avvessa.AvvessaPushPrivacyProvider"
             android:authorities="${applicationId}.avvessa.pushprivacy"
             android:process=":pushcore" android:exported="false" android:initOrder="1000" />

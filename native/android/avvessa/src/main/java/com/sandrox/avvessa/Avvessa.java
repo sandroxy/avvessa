@@ -94,6 +94,7 @@ public final class Avvessa {
             store.revokeConsent();
             consentGeneration++;
             activeNotificationContext = null; pendingOpenCleanup = false;
+            AvvessaPresentationProvider.clear();
             if (initialized) {
                 try { JPushInterface.stopPush(context); }
                 catch (RuntimeException error) { report(new PushException("sdk_error", "Cannot confirm SDK shutdown", error)); }

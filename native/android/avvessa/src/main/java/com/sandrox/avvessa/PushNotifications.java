@@ -9,12 +9,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
+import androidx.core.app.NotificationCompat;
 import cn.jpush.android.api.BasicPushNotificationBuilder;
 import cn.jpush.android.api.NotificationMessage;
 import java.util.UUID;
 
 final class PushNotifications {
     static final String PAYLOAD = "com.sandrox.avvessa.NOTIFICATION";
+    private static final String PRESENTATION_TOKEN = "com.sandrox.avvessa.PRESENTATION_TOKEN";
     private PushNotifications() {}
 
     static boolean foreground() {
@@ -51,6 +53,31 @@ final class PushNotifications {
             notification = Notification.Builder.recoverBuilder(context, notification).setChannelId(channel).build();
         }
         return notification;
+    }
+    static Notification silence(Context context, Notification notification, String token) {
+        android.os.Bundle extras = new android.os.Bundle(); extras.putString(PRESENTATION_TOKEN, token);
+        // Use per-notification silence, not a channel whose importance the user can change.
+        // The SDK still posts this object when its pre-display hook is skipped.
+        return new NotificationCompat.Builder(context, notification)
+                .setSilent(true).setPriority(NotificationCompat.PRIORITY_MIN).setDefaults(0).setLights(0, 0, 0)
+                .setGroup(null).setGroupSummary(false)
+                .setFullScreenIntent(null, false).setBubbleMetadata(null).setLocalOnly(true)
+                .setTimeoutAfter(1000).addExtras(extras).build();
+    }
+    static void removeSilenced(Context context, int notificationId, String token) {
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= 23) {
+            for (android.service.notification.StatusBarNotification active : manager.getActiveNotifications()) {
+                if (active.getId() == notificationId && active.getTag() == null
+                        && token.equals(active.getNotification().extras.getString(PRESENTATION_TOKEN))) {
+                    manager.cancel(notificationId);
+                    return;
+                }
+            }
+            // A timeout or a newer notification may already have replaced this instance.
+            return;
+        }
+        manager.cancel(notificationId);
     }
     static void openApplication(Context context) {
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());

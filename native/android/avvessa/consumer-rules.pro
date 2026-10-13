@@ -2,3 +2,4 @@
 -keep class com.sandrox.avvessa.AvvessaPushService { *; }
 -keep class com.sandrox.avvessa.AvvessaPrivacyProvider { *; }
 -keep class com.sandrox.avvessa.AvvessaPushPrivacyProvider { *; }
+-keep class com.sandrox.avvessa.AvvessaPresentationProvider { *; }
