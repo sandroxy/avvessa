@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "kind": "plugin-release-policy",
+  "plugin": "avvessa",
+  "sourceRepository": "https://github.com/sandroxy/avvessa.git",
+  "verifierRepository": "https://github.com/sandroxy/integrated-plugins.git",
+  "candidateSchemaVersion": 2,
+  "acceptanceReceiptSchemaVersion": 2,
+  "qualifications": [
+    "androidMavenSigned",
+    "artifactProvenanceVerified"
+  ],
+  "artifactRoles": {
+    "required": [
+      "checksum-native-android-core-aar",
+      "checksum-native-android-fcm-aar",
+      "checksum-native-android-honor-aar",
+      "checksum-native-android-huawei-aar",
+      "checksum-native-android-maven-repository",
+      "checksum-native-android-meizu-aar",
+      "checksum-native-android-oppo-aar",
+      "checksum-native-android-vivo-aar",
+      "checksum-native-android-xiaomi-aar",
+      "checksum-native-ios-spm-source",
+      "checksum-native-ios-xcframework",
+      "checksum-uniapp-legacy-package",
+      "checksum-uniapp-uts-package",
+      "native-android-core-aar",
+      "native-android-fcm-aar",
+      "native-android-honor-aar",
+      "native-android-huawei-aar",
+      "native-android-maven-repository",
+      "native-android-meizu-aar",
+      "native-android-oppo-aar",
+      "native-android-vivo-aar",
+      "native-android-xiaomi-aar",
+      "native-build-manifest",
+      "native-ios-spm-source",
+      "native-ios-xcframework",
+      "uniapp-legacy-package",
+      "uniapp-uts-package"
+    ],
+    "conditional": {}
+  },
+  "acceptance": {
+    "automatedTargets": [
+      "android",
+      "ios",
+      "uniapp-legacy-android",
+      "uniapp-legacy-ios",
+      "uniapp-uts-android",
+      "uniapp-uts-ios",
+      "uniapp-x-android",
+      "uniapp-x-ios"
+    ],
+    "manualTargets": [
+      "native-android-push-device",
+      "native-ios-push-device",
+      "uniapp-legacy-android-push-device",
+      "uniapp-legacy-ios-push-device",
+      "uniapp-uts-android-push-device",
+      "uniapp-uts-ios-push-device",
+      "uniapp-x-android-push-device",
+      "uniapp-x-ios-push-device"
+    ]
+  }
+}

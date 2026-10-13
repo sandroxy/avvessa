@@ -4,7 +4,11 @@ Avvessa supports iOS 13 and later and exposes Objective-C and Swift APIs. It dir
 
 ## Install
 
-For local source development, add this repository's root directory as a local Swift package in Xcode and select the `Avvessa` product. Commit the consumer's resolved package lock when using a published Git revision. The root `Package.swift` pins both official SDKs.
+In Xcode, add `https://github.com/sandroxy/avvessa.git` with the exact published version `1.0.0`, then select the `Avvessa` product. Tags have no `v` prefix. This is a source Swift package: it compiles the core and resolves the exact official SDK versions declared in `Package.swift`. Commit the consumer's `Package.resolved`.
+
+For local development, add the repository root as a local Swift package. The release source ZIP supplies the same package inputs for offline staging; initial SDK resolution still needs network access.
+
+For manual binary integration, use `avvessa-<version>.xcframework.zip` from the same GitHub Release. Add `Avvessa.xcframework` as **Do Not Embed**, copy `AvvessaPrivacy.bundle` into the app resources, and link UIKit, UserNotifications, Network, Security, CFNetwork, SystemConfiguration, CoreTelephony, CoreGraphics, WebKit, `z` and `resolv`. The static XCFramework already contains JPush/JCore; do not link them a second time. It includes arm64 devices and arm64/x86_64 simulators. A Swift host or an Objective-C host configured to embed required Swift standard libraries is required by the upstream SDK. This path is an alternative to SPM, not an additional dependency.
 
 Keep `$(inherited) -ObjC` in the application's Other Linker Flags so Objective-C SDK categories are linked from the static libraries.
 

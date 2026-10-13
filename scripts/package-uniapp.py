@@ -6,6 +6,7 @@ import json
 import shutil
 import subprocess
 import zipfile
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -45,8 +46,13 @@ def package(args):
         '-PavvessaCoreAar='+str(native/'avvessa/build/outputs/aar/avvessa-release.aar'),
         '-PdcloudUniappAar='+str(args.dcloud_android_aar.resolve()),':bridge:assembleRelease',':uniapp:assembleRelease','--console=plain')
     ios = output/'ios'
-    run('python3',ROOT/'scripts/build-uniapp-ios.py','--source-packages',args.source_packages.resolve(),
-        '--dcloud-ios-sdk',args.dcloud_ios_sdk.resolve(),'--output',ios)
+    if args.ios_products:
+        ios = args.ios_products.resolve()
+        for name in ('Avvessa.framework', 'AvvessaBridge.framework', 'AvvessaUni.framework', 'AvvessaPrivacy.bundle'):
+            if not (ios/name).is_dir(): raise SystemExit('Missing prebuilt iOS product: '+name)
+    else:
+        run('python3',ROOT/'scripts/build-uniapp-ios.py','--source-packages',args.source_packages.resolve(),
+            '--dcloud-ios-sdk',args.dcloud_ios_sdk.resolve(),'--output',ios)
     dependencies = json.loads(report.read_text())
     metadata = json.loads((ROOT/'plugin.json').read_text())
     common_dependencies = [entry['coordinate'] for entry in dependencies if not entry['bundled']]
@@ -80,12 +86,26 @@ def package(args):
         if kind=='legacy': copy(ROOT/'adapters/uniapp/android/build/outputs/aar/uniapp-release.aar',libs/'avvessa-uniapp.aar')
         for name in ('LICENSE','THIRD_PARTY_NOTICES.md'): copy(ROOT/name,root/name)
         readme=ROOT/'adapters/uniapp/README.md'
-        if readme.is_file(): copy(readme,root/'readme.md')
+        if readme.is_file():
+            # The same maintained guide is readable both in Git and as a standalone market package.
+            base = 'https://github.com/sandroxy/avvessa/blob/'+metadata['version']+'/'
+            def link(match):
+                label, target = match.groups()
+                if '://' in target or target.startswith('#'): return match.group(0)
+                path, sep, fragment = target.partition('#')
+                resolved = (readme.parent/path).resolve().relative_to(ROOT)
+                return '['+label+']('+base+str(resolved)+(sep+fragment if sep else '')+')'
+            (root/'readme.md').write_text(re.sub(r'\[([^\]]+)\]\(([^)]+)\)',link,readme.read_text()))
+        copy(ROOT/'CHANGELOG.md',root/'changelog.md')
+        if args.vendor_kit:
+            if selected: raise SystemExit('A release vendor kit requires an unmodified base package')
+            copy(args.vendor_kit,root/'tools/android-vendors.zip')
+            copy(ROOT/'scripts/configure-uniapp-vendors.py',root/'tools/configure-android-vendors.py')
         provenance={'kind':'avvessa-uniapp-package','version':metadata['version'],'mode':kind,'vendorModules':selected,
                     'dependencies':[{k:v for k,v in record.items() if k!='file'} for record in dependencies],
                     'files':{str(path.relative_to(root)):hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(root.rglob('*')) if path.is_file()}}
         write_json(root/'avvessa-package.json',provenance)
-        archive=output/f'avvessa-uniapp-{kind}-{metadata["version"]}.zip'
+        archive=output/f'avvessa-uniapp-{"legacy-" if kind == "legacy" else ""}{metadata["version"]}.zip'
         with zipfile.ZipFile(archive,'w',compression=zipfile.ZIP_DEFLATED) as zipped:
             for path in sorted(root.rglob('*')):
                 if path.is_file(): zipped.write(path,str(path.relative_to(root)))
@@ -98,5 +118,7 @@ if __name__ == '__main__':
     parser.add_argument('--source-packages',type=Path,required=True)
     parser.add_argument('--dcloud-android-aar',type=Path,required=True)
     parser.add_argument('--dcloud-ios-sdk',type=Path,required=True)
+    parser.add_argument('--ios-products',type=Path,help='Reuse frameworks built by this release preparation; never rebuild accepted bytes')
+    parser.add_argument('--vendor-kit',type=Path,help='Include optional Android transports as inactive consumer-selected files')
     parser.add_argument('--output',type=Path,default=ROOT/'dist/uniapp')
     package(parser.parse_args())

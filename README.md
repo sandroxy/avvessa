@@ -36,6 +36,8 @@ AppKey 不替代平台配置：iOS 需要匹配 Bundle ID 的 APNs 配置和签�
 - [原生架构](doc/architecture.md)
 - [本地构建与检查](BUILDING.md)
 - [第三方依赖与隐私资源](THIRD_PARTY_NOTICES.md)
+- [Release preparation and publication](RELEASING.md)
+- [Changelog](CHANGELOG.md)
 
 ## 许可证
 

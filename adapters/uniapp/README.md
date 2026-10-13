@@ -2,14 +2,14 @@
 
 Avvessa 为经典 uni-app 原生插件（legacy）、经典 uni-app UTS 插件和 uni-app x 提供 Android、iOS 推送接口。三种接入方式共用 Avvessa 原生核心及官方 JPush/JCore SDK；同一个应用只能选择其中一种，不能同时安装其他 JPush 包装器。
 
-此目录包含源代码和本地打包工具。版本、原生 SDK 锁定和平台要求见根目录 `plugin.json`；生成 ZIP 不等于已经上架插件市场。Android 最低 API 21，iOS 最低 13；实际宿主还需满足所用 DCloud SDK 的最低系统版本。UTS 工具链最低 HBuilderX 5.24。
+从 [GitHub Releases](https://github.com/sandroxy/avvessa/releases) 获取与版本一致的发行 ZIP，或从 UNI 插件市场导入 `Sandrox-Avvessa` UTS 插件。UTS 包同时支持经典 UTS 与 uni-app x；legacy ZIP 用于经典原生插件／离线接入。版本与原生 SDK 锁定见 [plugin.json](../../plugin.json)；各渠道是否可用以实际发布状态为准。Android 最低 API 21，iOS 最低 13；实际宿主还需满足所用 DCloud SDK 的最低系统版本。UTS 工具链最低 HBuilderX 5.24。
 
 ## 安装
 
 | 模式 | 包 | 放置目录 | 业务入口 |
 | --- | --- | --- | --- |
 | legacy | `avvessa-uniapp-legacy-<version>.zip` | `nativeplugins/Sandrox-Avvessa` | `@/nativeplugins/Sandrox-Avvessa/js_sdk/index.js` |
-| 经典 UTS | `avvessa-uniapp-uts-<version>.zip` | `uni_modules/Sandrox-Avvessa` | `@/uni_modules/Sandrox-Avvessa/js_sdk/index.js` |
+| 经典 UTS | `avvessa-uniapp-<version>.zip` | `uni_modules/Sandrox-Avvessa` | `@/uni_modules/Sandrox-Avvessa/js_sdk/index.js` |
 | uni-app x | 同一个 UTS 包 | `uni_modules/Sandrox-Avvessa` | `@/uni_modules/Sandrox-Avvessa/uts_sdk/index.uts` |
 
 解压后 `package.json` 位于上述目录根部。原生组件改变后重新构建应用或自定义基座；标准基座不包含 Avvessa。经典 UTS 的 JavaScript 必须使用 `js_sdk` 入口，它为持续事件建立单独的长连接回调，避免被 DCloud 的一次性回调规则释放。uni-app x 使用 `uts_sdk` 中的 UTS 消费端 API，同样通过单一持续回调分发订阅。两种入口提供同名方法，UTS 的结构化参数和结果使用 `UTSJSONObject`。
@@ -28,9 +28,17 @@ legacy 通过包内 `hooksClass` 接收应用及 APNs 回调；UTS 通过导出�
 
 ## Android 厂商通道与图标
 
-打包时用 `--vendors` 显式选择 `xiaomi,huawei,oppo,vivo,honor,meizu,fcm` 的子集；省略表示仅使用极光基础通道。包中只包含选中的官方厂商组件。不要同时再安装同厂商的另一套推送适配器。
+正式 ZIP 默认只加载基础通道。七种可选 Android 厂商组件随包放在 `tools/android-vendors.zip`，不在 DCloud 自动加载的 libs 目录。消费应用可显式选择子集，无需重新编译 Avvessa：
 
-厂商参数和服务 JSON 属于消费应用，不进入可公开分发的插件 ZIP。`scripts/prepare-uniapp-android.py` 将本地配置生成为仅供该应用使用的资源 AAR 和宿主清单，华为／FCM 资源分别由官方 AGConnect／Google Services 插件生成。
+```sh
+python3 /path/to/Sandrox-Avvessa/tools/configure-android-vendors.py \
+  --module /path/to/Sandrox-Avvessa \
+  --vendors xiaomi,huawei,oppo,vivo,honor,meizu
+```
+
+留空 `--vendors ''` 可移除该工具安装的组件；FCM 需明确加入 `fcm`。工具验证包内清单与哈希，拒绝覆盖手工改动，只调整当前消费副本。市场发布应使用原始 UTS 包，不能上传已配置的副本。源码开发仍可通过打包脚本的 `--vendors` 构建指定组合。
+
+厂商参数和服务 JSON 属于消费应用，不进入可公开分发的插件 ZIP。同一 Release 的 `avvessa-<version>-source.zip` 中，`scripts/prepare-uniapp-android.py` 将本地配置生成为仅供该应用使用的资源 AAR 和宿主清单，华为／FCM 资源分别由官方 AGConnect／Google Services 插件生成。
 
 1. 把生成的 `configuration-release.aar` 放在 legacy 包的 `android/avvessa-consumer.aar`，或 UTS 包的 `utssdk/app-android/libs/avvessa-consumer.aar`。
 2. 将同一输出目录的 `AndroidManifest.xml` 放在 UNI 项目根目录。已有该文件时，合并其中的权限规则和 `application` 子节点，保留原有宿主配置。离线 Android 工程则合并到应用模块的 `src/main/AndroidManifest.xml`。
@@ -177,7 +185,7 @@ python3 scripts/prepare-uniapp-android.py --config /absolute/path/to/consumer.lo
 
 ```sh
 node --test adapters/uniapp/tests/*.test.mjs
-python3 scripts/check-uniapp-uts.py dist/uniapp/avvessa-uniapp-uts-0.1.0.zip \
+python3 scripts/check-uniapp-uts.py dist/uniapp/avvessa-uniapp-0.1.0.zip \
   --hbuilder-contents /absolute/path/to/HBuilderX \
   --classic-ios-sdk /absolute/path/to/classic-ios-sdk \
   --x-android-sdk /absolute/path/to/uniapp-x-android-sdk \

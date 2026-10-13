@@ -1,7 +1,7 @@
 apply plugin: "maven-publish"
 group = rootProject.ext.avvessaManifest.native.android.group
 version = rootProject.ext.avvessaManifest.version
-android.publishing { singleVariant("release") { withSourcesJar() } }
+android.publishing { singleVariant("release") { withSourcesJar(); withJavadocJar() } }
 afterEvaluate {
     publishing {
         publications {
@@ -17,10 +17,17 @@ afterEvaluate {
                         url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
                     } }
                     developers { developer { id = "sandroxy"; name = "SandroX" } }
-                    scm { url = "https://github.com/sandroxy/avvessa.git" }
+                    scm {
+                        url = "https://github.com/sandroxy/avvessa"
+                        connection = "scm:git:https://github.com/sandroxy/avvessa.git"
+                        developerConnection = "scm:git:ssh://git@github.com/sandroxy/avvessa.git"
+                    }
                 }
             }
         }
-        repositories { maven { url = rootProject.layout.buildDirectory.dir("maven") } }
+        repositories { maven {
+            name = "Candidate"
+            url = uri(rootProject.findProperty("avvessaCandidateRepository") ?: rootProject.layout.buildDirectory.dir("maven").get().asFile)
+        } }
     }
 }

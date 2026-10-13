@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "avvessa",
   "displayName": "Avvessa",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "repository": "https://github.com/sandroxy/avvessa.git",
   "license": "Apache-2.0",
   "native": {

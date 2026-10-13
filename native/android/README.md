@@ -4,36 +4,22 @@ Avvessa supports API 21 and later. Compile the library with JDK 17 and API 36. T
 
 ## Install the native artifact
 
-Build the local Maven repository:
+The Maven Central coordinates for this release are:
 
-```sh
-cd native/android
-./gradlew assembleRelease publish
-```
-
-In the consumer's `settings.gradle`, add Google, Maven Central and the local output:
-
-```groovy
-dependencyResolutionManagement {
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = uri(avvessaMavenDirectory) }
-    }
-}
-```
-
-`avvessaMavenDirectory` is the absolute path to the checkout's `native/android/build/maven`, supplied by the consumer's local Gradle configuration. Then use the version declared in the built repository:
-
-```groovy
+```gradle
+repositories { google(); mavenCentral() }
 dependencies {
-    implementation "io.github.sandroxy:avvessa:0.1.0"
+    implementation "io.github.sandroxy:avvessa:1.0.0"
+    // Add only the transports configured for this application:
+    // implementation "io.github.sandroxy:avvessa-xiaomi:1.0.0"
 }
 ```
 
-The coordinates above describe locally built artifacts. They do not assert a Maven Central release. Keep the Maven metadata and transitive dependencies; a bare AAR is not a complete SDK installation.
+Use the version listed in [GitHub Releases](https://github.com/sandroxy/avvessa/releases) after the corresponding Maven deployment is public. Optional modules are `avvessa-xiaomi`, `avvessa-huawei`, `avvessa-oppo`, `avvessa-vivo`, `avvessa-honor`, `avvessa-meizu` and `avvessa-fcm`; each carries its pinned SDK dependencies. Huawei and Honor additionally require their official Maven repositories, as shown in this repository's `settings.gradle`.
 
-Do not also install `jpush-react-native`, `jcore-react-native` or another push wrapper that initializes the same native SDK. Avvessa supplies the message receiver and SDK service declarations.
+For local source development, `./gradlew publish` in `native/android` writes only to `native/android/build/maven`. Add that directory as a local Maven repository in the consumer. No credentials or remote upload are involved. The [build guide](../../BUILDING.md) describes the toolchain.
+
+Release AAR mirrors have the same bytes as Maven Central. Keep the POM/Gradle metadata and transitive dependencies; copying a bare AAR is not a complete SDK installation.
 
 ## Consent and initialization
 
@@ -156,7 +142,7 @@ Example for Xiaomi, with values obtained from local Gradle properties:
 
 ```groovy
 dependencies {
-    implementation "io.github.sandroxy:avvessa-xiaomi:0.1.0"
+    implementation "io.github.sandroxy:avvessa-xiaomi:1.0.0"
 }
 android {
     defaultConfig {

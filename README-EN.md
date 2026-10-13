@@ -36,6 +36,8 @@ Source integration and local build commands are available in this repository. [p
 - [Native architecture](doc/architecture.md)
 - [Local builds and checks](BUILDING.md)
 - [Third-party dependencies and privacy resources](THIRD_PARTY_NOTICES.md)
+- [Release preparation and publication](RELEASING.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

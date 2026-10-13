@@ -33,7 +33,9 @@ def build(args):
         raise SystemExit('Output must be inside an ignored repository build directory')
     output.mkdir(parents=True, exist_ok=True)
     sdk = subprocess.check_output(['xcrun', '--sdk', args.sdk, '--show-sdk-path'], text=True).strip()
-    target = f'arm64-apple-ios{native["minimumVersion"]}' + ('-simulator' if args.sdk == 'iphonesimulator' else '')
+    if args.arch != 'arm64' and args.sdk != 'iphonesimulator':
+        raise SystemExit('Only arm64 is supported on physical iOS devices')
+    target = f'{args.arch}-apple-ios{native["minimumVersion"]}' + ('-simulator' if args.sdk == 'iphonesimulator' else '')
     flags = ['-isysroot', sdk, '-target', target, '-fobjc-arc', '-fblocks', '-fmodules', '-O2', '-fvisibility=hidden',
              '-ffile-prefix-map=' + str(ROOT) + '=.', '-Werror=implicit-function-declaration', '-F', str(output)]
     for path in sdks: flags += ['-I', str(path / 'Headers')]
@@ -57,7 +59,16 @@ def build(args):
             obj = objects / (source.stem + '.o')
             run('xcrun', 'clang', *flags, *[arg for p in includes for arg in ('-I', str(p))], '-c', source, '-o', obj)
             compiled.append(obj)
-        run('xcrun', 'libtool', '-static', '-o', destination / name, *compiled, *libraries)
+        selected_libraries = []
+        for library in libraries:
+            architectures = subprocess.check_output(['xcrun','lipo','-archs',str(library)],text=True).split()
+            if args.arch not in architectures: raise SystemExit('SDK archive lacks '+args.arch)
+            if len(architectures) > 1:
+                selected = objects / library.name
+                run('xcrun','lipo',library,'-thin',args.arch,'-output',selected)
+                selected_libraries.append(selected)
+            else: selected_libraries.append(library)
+        run('xcrun', 'libtool', '-static', '-o', destination / name, *compiled, *selected_libraries)
         return destination
 
     core = ROOT / 'native/ios/Sources/Avvessa'
@@ -93,5 +104,6 @@ if __name__ == '__main__':
     parser.add_argument('--source-packages', type=Path, required=True, help='Xcode SourcePackages directory containing pinned checkouts')
     parser.add_argument('--dcloud-ios-sdk', type=Path, help='Official classic SDK root; also builds the legacy transport')
     parser.add_argument('--sdk', choices=['iphoneos','iphonesimulator'], default='iphoneos')
+    parser.add_argument('--arch', choices=['arm64','x86_64'], default='arm64')
     parser.add_argument('--output', type=Path, required=True)
     build(parser.parse_args())

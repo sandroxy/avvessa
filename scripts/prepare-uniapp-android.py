@@ -72,7 +72,12 @@ def prepare(args):
     color=getattr(args,'notification_color',None)
     if color is not None and not re.fullmatch(r'#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?',color): raise SystemExit('notification color must be #RRGGBB or #AARRGGBB')
     work=args.output.resolve()
-    if work==ROOT or ROOT not in work.parents or subprocess.run(['git','check-ignore','-q',str(work)],cwd=ROOT).returncode: raise SystemExit('Output must be inside an ignored product build directory')
+    if work==ROOT or ROOT not in work.parents: raise SystemExit('Output must remain inside the package directory')
+    in_git = subprocess.run(['git','rev-parse','--is-inside-work-tree'],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode == 0
+    if in_git:
+        if subprocess.run(['git','check-ignore','-q',str(work)],cwd=ROOT).returncode: raise SystemExit('Output must be ignored by Git')
+    elif work != ROOT/'.build' and ROOT/'.build' not in work.parents:
+        raise SystemExit('Extracted source packages write consumer resources only under .build/')
     work.mkdir(parents=True,exist_ok=True)
     def write(path,text):
         p=work/path;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(text);p.chmod(0o600)

@@ -65,9 +65,13 @@ python3 -m unittest discover -s scripts/tests -v
 native/android/gradlew -p adapters/android \
   -PavvessaCoreAar="$PWD/native/android/avvessa/build/outputs/aar/avvessa-release.aar" \
   :bridge:testDebugUnitTest
-python3 scripts/check-uniapp-android.py dist/uniapp/avvessa-uniapp-uts-0.1.0.zip
+python3 scripts/check-uniapp-android.py dist/uniapp/avvessa-uniapp-1.0.0.zip
 ```
 
 For a ZIP containing vendor transports, provide both `--configuration-aar` and `--consumer-manifest` from `prepare-uniapp-android.py`. A legacy ZIP additionally requires `--dcloud-android-aar`. The Android check links resources and bytecode and verifies the final manifest's consumer metadata, permission removals and disabled implicit JPush initialization. It creates an unsigned artifact without installing or running it.
 
 `scripts/check-uniapp-uts.py` compiles the packaged Android/iOS UTS transports against local classic and uni-app x SDKs. The separate integration repository also builds all three consumer frontends on both platforms and checks that persistent event callbacks survive DCloud's generated JS/native proxy. These checks do not prove notification delivery or lifecycle behavior on devices.
+
+## Distribution builds
+
+See [RELEASING.md](RELEASING.md) for local signed Central bundles, native XCFrameworks, the source SPM package and UNI archives. Preparation never performs remote publication. Ordinary `publish` remains a local Maven task.
