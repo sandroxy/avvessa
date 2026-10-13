@@ -38,7 +38,7 @@ python3 /path/to/Sandrox-Avvessa/tools/configure-android-vendors.py \
 
 留空 `--vendors ''` 可移除该工具安装的组件；FCM 需明确加入 `fcm`。工具验证包内清单与哈希，拒绝覆盖手工改动，只调整当前消费副本。市场发布应使用原始 UTS 包，不能上传已配置的副本。源码开发仍可通过打包脚本的 `--vendors` 构建指定组合。
 
-厂商参数和服务 JSON 属于消费应用，不进入可公开分发的插件 ZIP。同一 Release 的 `avvessa-<version>-source.zip` 中，`scripts/prepare-uniapp-android.py` 将本地配置生成为仅供该应用使用的资源 AAR 和宿主清单，华为／FCM 资源分别由官方 AGConnect／Google Services 插件生成。
+厂商参数和服务 JSON 属于消费应用，不进入可公开分发的插件 ZIP。检出插件版本对应的 Git tag，或解压该 Release 自动提供的 **Source code** 归档，使用其中的 `scripts/prepare-uniapp-android.py` 将本地配置生成为仅供该应用使用的资源 AAR 和宿主清单；华为／FCM 资源分别由官方 AGConnect／Google Services 插件生成。
 
 1. 把生成的 `configuration-release.aar` 放在 legacy 包的 `android/avvessa-consumer.aar`，或 UTS 包的 `utssdk/app-android/libs/avvessa-consumer.aar`。
 2. 将同一输出目录的 `AndroidManifest.xml` 放在 UNI 项目根目录。已有该文件时，合并其中的权限规则和 `application` 子节点，保留原有宿主配置。离线 Android 工程则合并到应用模块的 `src/main/AndroidManifest.xml`。

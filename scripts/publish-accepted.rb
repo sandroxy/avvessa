@@ -37,11 +37,12 @@ when "github"
   puts "In https://github.com/sandroxy/avvessa/releases select the existing tag #{version}."
   puts "Title: Avvessa #{version}. Use a short summary and link to the tag's CHANGELOG.md."
   puts "Attach only these initial GitHub Release files:"
-  %w[native-ios-xcframework native-build-manifest native-ios-spm-source checksum-native-ios-spm-source
+  %w[native-ios-xcframework native-build-manifest
      uniapp-legacy-package checksum-uniapp-legacy-package uniapp-uts-package checksum-uniapp-uts-package].each do |role|
     puts path.call(role)
   end
   puts "Android AARs and their sidecars are added later by Mirror Android AAR, from published Maven Central bytes."
+  puts "The source ZIP and its checksum remain local candidate inputs. SPM and public configuration tools use the release Git tag."
   puts "The Maven ZIP belongs in Central Portal; other candidate checksums remain local acceptance evidence."
 when "maven"
   puts "In https://central.sonatype.com/publishing upload this signed Central bundle in user-managed mode:"
