@@ -30,7 +30,7 @@ Avvessa 是基于极光官方原生 SDK 的通用推送组件，提供 Android �
 
 AppKey 不替代平台配置：iOS 需要匹配 Bundle ID 的 APNs 配置和签名能力；Android 厂商通道需要对应厂商应用参数。服务端 Master Secret 不进入客户端。
 
-从 [GitHub Releases](https://github.com/sandroxy/avvessa/releases) 选择发布版本，并使用对应 tag 的文档。包版本与 SDK 依赖由 [plugin.json](plugin.json) 维护，最低系统和宿主要求见各平台接入指南。
+从 [GitHub Releases](https://github.com/sandroxy/avvessa/releases) 选择发布版本。默认分支维护已发布功能的接入指南与文档更正；历史版本的接口和依赖以对应 tag 为准。包版本与 SDK 依赖由 [plugin.json](plugin.json) 维护，最低系统和宿主要求见各平台接入指南。
 
 - [事件、状态与生命周期契约](doc/contract.md)
 - [第三方依赖与隐私资源](THIRD_PARTY_NOTICES.md)

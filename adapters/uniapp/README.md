@@ -118,23 +118,51 @@ export async function enablePush(appKey) {
 
 调用方保存返回的订阅 ID，在所属页面或应用生命周期结束时调用 `await push.unsubscribe(subscriptionId)`，并处理 `enablePush` 的拒绝结果。`subscribe` 回调中的异步业务处理也需自行捕获错误。legacy 使用安装表中的另一条导入路径。
 
-uni-app x 使用 UTS 消费入口，例如已初始化后的订阅：
+uni-app x 使用 UTS 消费入口。以下示例区分首次同意与后续启动恢复；将 AppKey 替换为本应用配置，并使 APNs 环境匹配实际签名：
 
 ```uts
 import * as push from '@/uni_modules/Sandrox-Avvessa/uts_sdk/index.uts'
+
+const configuration: UTSJSONObject = {
+  appKey: '<Jiguang AppKey>',
+  ios: { apnsEnvironment: 'development' },
+}
 
 async function observePush(): Promise<string> {
   return await push.subscribe((message: UTSJSONObject) => {
     if (message.getString('kind') == 'event') {
       const event = message.getJSON('event')
-      console.log(event)
-      // 完成业务处理后，用 event.getString('id') 调用 acknowledge。
+      if (event != null) {
+        console.log(event)
+        // 完成业务处理后，读取非空的 event.getString('id')，再调用 acknowledge。
+      }
+    } else {
+      // state 包含 registrationId 等状态；error 包含原生诊断。
+      console.log(message)
     }
   }, { replayPending: true } as UTSJSONObject)
 }
+
+// 仅从用户明确同意的操作调用。
+export async function enablePush(): Promise<string> {
+  await push.setConsentGranted(true)
+  await push.initialize(configuration)
+  await push.requestNotificationPermission()
+  return await observePush()
+}
+
+// 应用启动时调用；enabledByApp 来自宿主保存的推送启用选择。
+export async function restorePush(enabledByApp: boolean): Promise<string | null> {
+  const state = await push.getState()
+  if (!enabledByApp || state.getBoolean('consentGranted') != true) return null
+  await push.initialize(configuration)
+  return await observePush()
+}
 ```
 
-UTS 初始化也使用同名方法，结构化参数传入 `UTSJSONObject`。错误对象具有 `name/code/message/nativeCode/nativeDomain`，不要求继承平台 `Error`。订阅 ID 应保存到所属页面或应用的生命周期中，结束时调用 `unsubscribe`。
+首次启用调用 `enablePush()`，后续启动调用 `restorePush(enabledByApp)`；恢复函数返回 `null` 时不创建订阅。调用方处理 Promise 拒绝，保存非空订阅 ID，并在所属生命周期结束时调用 `await push.unsubscribe(subscriptionId)`。同一生命周期只保留一个业务订阅，避免反复点击启用按钮或页面显示时重复订阅；取消订阅不停止推送，也不改变宿主保存的启用选择。
+
+UTS 的结构化参数和结果使用 `UTSJSONObject`。错误对象具有 `name/code/message/nativeCode/nativeDomain`，不要求继承平台 `Error`。示例仅输出事件，不自动确认消费；业务处理成功后再调用 `acknowledge`。
 
 冷启动恢复时，先等待 `getState()`，读取其 `consentGranted`（UTS 使用 `getBoolean('consentGranted')`）。仅在同意仍有效、且宿主记录为需要启用推送时调用 `initialize` 并恢复订阅；不要重新调用授予同意或申请权限的流程。`initialized` 只描述本次进程状态，不能用于判断以前是否启用过推送。
 

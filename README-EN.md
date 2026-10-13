@@ -30,7 +30,7 @@ Persistent connections, APNs, and vendor channels have different delivery condit
 
 An AppKey does not replace platform setup. iOS requires APNs configuration and signing capabilities matching the Bundle ID. Android vendor channels require the corresponding vendor application settings. Never embed the server-side Master Secret in a client.
 
-Choose a version from [GitHub Releases](https://github.com/sandroxy/avvessa/releases) and use the documentation at its tag. [plugin.json](plugin.json) maintains package and SDK versions; each platform guide describes minimum system and host requirements.
+Choose a version from [GitHub Releases](https://github.com/sandroxy/avvessa/releases). The default branch maintains integration guides and documentation corrections for released features; consult the corresponding tag for historical APIs and dependencies. [plugin.json](plugin.json) maintains package and SDK versions; each platform guide describes minimum system and host requirements.
 
 - [Event, state, and lifecycle contract](doc/contract.md)
 - [Third-party dependencies and privacy resources](THIRD_PARTY_NOTICES.md)
