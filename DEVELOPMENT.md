@@ -111,7 +111,7 @@ python3 scripts/package-uniapp.py \
   --dcloud-ios-sdk /absolute/path/to/classic-ios-sdk
 ```
 
-Local packages are written to `dist/uniapp/`. Optional `--vendors huawei,honor,xiaomi,meizu,oppo,vivo` selects transports for a source build; formal release packaging instead includes an inactive vendor kit. Application resources are prepared separately as described in the [UNI guide](adapters/uniapp/README.md#android-厂商通道与图标).
+Local packages are written to `dist/uniapp/`. Optional `--vendors huawei,honor,xiaomi,meizu,oppo,vivo` selects transports for a source build; formal release packaging instead includes an inactive vendor kit. Application resources are prepared separately as described in the [UNI guide](adapters/uniapp/README.md#配置-android).
 
 UNI iOS archives contain arm64 device frameworks. `scripts/build-uniapp-ios.py --sdk iphonesimulator` builds simulator components separately; device frameworks cannot be used in a simulator. The builder also links an unsigned probe for missing SDK symbols and Swift runtime dependencies.
 

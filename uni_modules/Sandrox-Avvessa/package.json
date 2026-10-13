@@ -29,7 +29,7 @@
     },
     "declaration": {
       "ads": "无",
-      "data": "按宿主同意结果接入极光和选择的厂商推送 SDK，向相应服务商注册设备并接收消息；插件本地保存待消费事件，不向作者服务器发送数据。数据处理要求见各 SDK 的隐私说明。",
+      "data": "在宿主取得用户同意并初始化后，由极光 JPush/JCore 及按需接入的厂商推送 SDK 注册设备并接收消息，相关数据发送至对应服务提供方。插件在应用本地保存待消费推送事件，不向作者服务器发送数据。\n\n极光 SDK 数据处理及隐私政策：\nhttps://www.jiguang.cn/license/privacy\n\n可选厂商 SDK 名称、服务提供方及隐私政策：\nhttps://docs.jiguang.cn/jpush/client/jghgzy_a_i_h",
       "permissions": "通知权限、网络访问及选择的厂商 SDK 必需权限；iOS APNs entitlement。"
     },
     "darkmode": "√",
@@ -48,23 +48,50 @@
       "client": {
         "uni-app": {
           "vue": {
-            "vue2": "√",
-            "vue3": "√"
+            "vue2": {
+              "extVersion": "1.0.0",
+              "minVersion": ""
+            },
+            "vue3": {
+              "extVersion": "1.0.0",
+              "minVersion": ""
+            }
           },
           "web": {
             "safari": "x",
             "chrome": "x"
           },
           "app": {
-            "vue": "√",
+            "vue": {
+              "extVersion": "1.0.0",
+              "minVersion": ""
+            },
             "nvue": "x",
             "android": {
-              "minVersion": "21"
+              "minVersion": "23",
+              "extVersion": "1.0.0"
             },
             "ios": {
-              "minVersion": "13"
+              "minVersion": "15",
+              "extVersion": "1.0.0"
             },
             "harmony": "x"
+          },
+          "mp": {
+            "alipay": "x",
+            "baidu": "x",
+            "harmony": "x",
+            "jd": "x",
+            "kuaishou": "x",
+            "lark": "x",
+            "qq": "x",
+            "toutiao": "x",
+            "weixin": "x",
+            "xhs": "x"
+          },
+          "quickapp": {
+            "huawei": "x",
+            "union": "x"
           }
         },
         "uni-app-x": {
@@ -74,12 +101,17 @@
           },
           "app": {
             "android": {
-              "minVersion": "23"
+              "minVersion": "23",
+              "extVersion": "1.0.0"
             },
             "ios": {
-              "minVersion": "15"
+              "minVersion": "15",
+              "extVersion": "1.0.0"
             },
             "harmony": "x"
+          },
+          "mp": {
+            "weixin": "x"
           }
         }
       }

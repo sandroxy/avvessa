@@ -18,7 +18,7 @@ python3 scripts/prepare-release.py \
 
 The command builds and signs the Maven modules with POM, Gradle metadata, source and documentation jars. It builds the iOS device frameworks for both UNI packages and the native XCFramework, plus separate simulator slices. It verifies signatures and consistency of the native binaries embedded in each package.
 
-Both UNI archives include the same inactive optional Android vendor kit. Consumer AppKeys, service JSON, signing and DCloud authorization stay outside distribution archives. Consumer installation is described in the [UNI guide](adapters/uniapp/README.md#安装).
+Both UNI archives include the same inactive optional Android vendor kit. Consumer AppKeys, service JSON, signing and DCloud authorization stay outside distribution archives. Consumer installation is described in the [UNI guide](adapters/uniapp/README.md#安装插件).
 
 The output is `dist/candidate.json` and its referenced files. `--rehearsal` permits uncommitted source and omitted signing for local checks, writes under `dist/rehearsal`, and cannot be used as a formal candidate. Preparation refuses to overwrite an existing formal candidate; preserve it separately before preparing a replacement. Once accepted, publish those exact files without rebuilding, re-signing or repacking.
 
