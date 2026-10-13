@@ -25,7 +25,7 @@ Incoming-call handling is outside this package: PushKit delivery obligations, Ca
 
 ## Android
 
-`Avvessa` is process-scoped. Initialize it in the application process. The SDK service runs in `:pushcore`; private providers restore consent before SDK components and synchronize later consent changes. The SDK's automatic initialization provider and SDK-owned optional location, phone-state, package-query and storage permissions are removed by manifest merge rules.
+`Avvessa` is process-scoped. Initialize it in the application process. The SDK service runs in `:pushcore`; private providers restore consent before SDK components and synchronize later consent changes. The service provider restores the last explicitly initialized configuration through the public JPush initialization API, including its process-local AppKey and vendor settings. This works when the service restarts while the application process remains alive. A transactional storage snapshot gates restoration on consent and configuration; withdrawal blocks it until explicit initialization or resume. The SDK's automatic initialization provider and SDK-owned optional location, phone-state, package-query and storage permissions are removed by manifest merge rules.
 
 A separate private presentation provider owns short-lived in-memory decisions in the application process. SDK builders in another process query that provider instead of reading a separate copy of the current page context. Decisions follow the SDK message ID because the SDK may assign the final notification ID only after construction. Silenced notifications carry an instance token so removal on Android 6 and later does not cancel a newer notification that reused the same ID.
 

@@ -8,24 +8,29 @@ import android.os.Bundle;
 import android.util.Log;
 import cn.jiguang.api.utils.JCollectionAuth;
 
-/** Applies persisted consent before SDK components run, without initializing push. */
+/** Restores primary-process consent; explicit initialization remains the host's responsibility. */
 public class AvvessaPrivacyProvider extends ContentProvider {
     @Override public boolean onCreate() {
         if (getContext() == null) return false;
-        applyConsent();
+        try { synchronize(); }
+        catch (RuntimeException error) { Log.e("Avvessa", "Cannot restore push state; collection stays disabled", error); }
         return true;
     }
-    private void applyConsent() {
-        boolean consent = false;
+    protected void applyConsent() {
+        boolean consent;
         try (EventStore store = new EventStore(getContext())) { consent = store.consent(); }
-        catch (RuntimeException error) { Log.e("Avvessa", "Cannot restore consent; collection stays disabled", error); }
         JCollectionAuth.setAuth(getContext(), consent);
-        JCollectionAuth.enableAutoWakeup(getContext(), false);
-        JCollectionAuth.enableDynamicLoad(getContext(), false);
+    }
+    private synchronized void synchronize() {
+        try { applyConsent(); }
+        catch (RuntimeException error) {
+            JCollectionAuth.setAuth(getContext(), false);
+            throw error;
+        }
     }
     @Override public Bundle call(String method, String argument, Bundle extras) {
         if (!"syncConsent".equals(method)) throw new IllegalArgumentException("Unknown privacy operation");
-        applyConsent();
+        synchronize();
         return Bundle.EMPTY;
     }
     @Override public Cursor query(Uri uri, String[] projection, String selection, String[] args, String order) { return null; }

@@ -16,7 +16,6 @@ import androidx.core.app.NotificationManagerCompat;
 import cn.jiguang.api.utils.JCollectionAuth;
 import cn.jpush.android.api.JPushInterface;
 import cn.jpush.android.api.JPushMessage;
-import cn.jpush.android.data.JPushConfig;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -122,36 +121,22 @@ public final class Avvessa {
         if (!isMainProcess(context)) throw new PushException("invalid_process", "Initialize Avvessa in the application process only");
         if (config == null) throw new PushException("invalid_configuration", "Configuration is required");
         if (!store.consent()) throw new PushException("consent_required", "Explicit consent is required before initialization");
-        config.validateResources(context);
-        Object manifestKey = PushVendors.metadata(context).get("JPUSH_APPKEY");
-        if (manifestKey != null && !manifestKey.toString().isEmpty() && !manifestKey.toString().equals(config.appKey))
-            throw new PushException("configuration_conflict", "Manifest AppKey differs from the runtime AppKey");
+        PushSdk.validate(context, config);
         if (initialized) {
             if (!configuration.toJson(context).toString().equals(config.toJson(context).toString()))
                 throw new PushException("configuration_conflict", "The process already uses a different configuration");
+            store.saveConfiguration(config.toJson(context).toString());
+            synchronizePrivacy();
             return;
         }
         if (savedAppKey != null && !savedAppKey.equals(config.appKey))
             throw new PushException("configuration_conflict", "Changing AppKey requires clearing this application's data");
-        PushVendors.validate(context);
-        store.state("configuration", config.toJson(context).toString());
+        store.saveConfiguration(config.toJson(context).toString());
         configuration = config;
         savedAppKey = config.appKey;
         lastError = null;
-        JCollectionAuth.setAuth(context, true);
         synchronizePrivacy();
-        JCollectionAuth.enableAutoWakeup(context, false);
-        JCollectionAuth.enableDynamicLoad(context, false);
-        JPushInterface.setDebugMode(config.debug);
-        JPushInterface.setChannel(context, config.channel);
-        JPushInterface.setGeofenceEnable(context, false);
-        JPushInterface.setSmartPushEnable(context, false);
-        JPushInterface.setDataInsightsEnable(context, false);
-        PushNotifications.ensureDefaultChannel(context, config);
-        JPushConfig sdkConfig = new JPushConfig(); sdkConfig.setjAppKey(config.appKey);
-        PushVendors.apply(context, sdkConfig);
-        JPushInterface.init(context, sdkConfig);
-        JPushInterface.setNotificationCallBackEnable(context, true);
+        PushSdk.initialize(context, config);
         initialized = true;
         if (!lifecycleInstalled && context instanceof Application) {
             ((Application) context).registerActivityLifecycleCallbacks(new PushLifecycle(this)); lifecycleInstalled = true;
@@ -227,7 +212,10 @@ public final class Avvessa {
     }
     public synchronized void stopPush() { requireInitialized(); JPushInterface.stopPush(context); emitState(); }
     public synchronized void resumePush() {
-        requireInitialized(); JPushInterface.resumePush(context);
+        requireInitialized();
+        store.saveConfiguration(configuration.toJson(context).toString());
+        synchronizePrivacy();
+        JPushInterface.resumePush(context);
         String registration = JPushInterface.getRegistrationID(context);
         if (registration != null && !registration.isEmpty()) store.state("registrationId", registration);
         emitState();

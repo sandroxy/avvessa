@@ -50,10 +50,28 @@ final class EventStore extends SQLiteOpenHelper {
     }
     boolean consent() { return "true".equals(state("consent")); }
 
+    synchronized void saveConfiguration(String configuration) {
+        SQLiteDatabase database = getWritableDatabase(); database.beginTransaction();
+        try {
+            state("configuration", configuration); state("sdkRestoreBlocked", null);
+            database.setTransactionSuccessful();
+        } finally { database.endTransaction(); }
+    }
+
+    /** Read authorization and identity from one cross-process snapshot. */
+    synchronized String restorableConfiguration() {
+        SQLiteDatabase database = getReadableDatabase(); database.beginTransaction();
+        try {
+            String result = consent() && !"true".equals(state("sdkRestoreBlocked")) ? state("configuration") : null;
+            database.setTransactionSuccessful();
+            return result;
+        } finally { database.endTransaction(); }
+    }
+
     synchronized void revokeConsent() {
         SQLiteDatabase database = getWritableDatabase(); database.beginTransaction();
         try {
-            state("consent", "false"); state("registrationId", null);
+            state("consent", "false"); state("registrationId", null); state("sdkRestoreBlocked", "true");
             database.delete("events", null, null); database.delete("dedup", null, null);
             database.setTransactionSuccessful();
         } finally { database.endTransaction(); }

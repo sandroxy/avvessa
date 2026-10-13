@@ -13,9 +13,11 @@ cd native/android
 
 `publish` writes only to `native/android/build/maven`. It does not publish to a remote registry. The directory contains the base and optional vendor artifacts, POMs, source jars and Gradle metadata. Consumers should use Maven metadata instead of copying only an AAR and losing transitive dependencies.
 
-The tests run with SDK startup components excluded and do not initialize JPush. They cover persistence, acknowledgement, cross-callback identity aliases, reused notification IDs, unidentified messages, eviction, concurrent creation, privacy withdrawal, receipt preservation during suppression, and foreground transition boundaries. Android and iOS policy tests consume the same JSON fixtures.
+The tests run with SDK startup components excluded. Storage and policy checks do not initialize JPush; the isolated SDK fixtures are described below. The tests cover persistence, acknowledgement, cross-callback identity aliases, reused notification IDs, unidentified messages, eviction, concurrent creation, privacy withdrawal, receipt preservation during suppression, and foreground transition boundaries. Android and iOS policy tests consume the same JSON fixtures.
 
 The Android dispatch regression also calls the pinned JPush notification dispatcher with JCore network operations replaced by a test shadow. It checks ordinary payloads that omit `display_foreground`, the explicit pre-display gate, silence before posting, removal, context changes and the application-provider boundary. The fixture's SDK-internal entry points are test-only and must be reviewed when updating JPush. These checks cannot validate a manufacturer's notification UI.
+
+The process-restoration regression runs the pinned SDK's public initialization and real AppKey validation with service/network dispatch isolated. It covers missing-key diagnostics, service recreation with retained app data, repeated consent synchronization, invalid configuration, consent withdrawal and explicit resume. These fixtures initialize SDK state inside the test sandbox only; they neither register a device nor establish a push connection.
 
 The checked-in Gradle wrapper and Android Gradle Plugin form the supported local build baseline. The official JPush and some vendor jars emit R8 stack-map warnings with this toolchain. Do not hide those warnings or treat compilation as device validation; verify release builds when changing the SDK or shrinker.
 

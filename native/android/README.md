@@ -59,7 +59,7 @@ New default notification channels use `IMPORTANCE_HIGH`. Previously created chan
 
 Opening the application restores its existing launcher task without clearing its pages. If no such task exists, Avvessa starts the application's declared launcher. This supports hosts whose launcher forwards to another Activity, including notification clicks that JPush has already used to start the host. Server-defined notification destinations are handled by JPush independently of Avvessa's launcher option.
 
-The SDK's auto-init provider is removed. Private providers restore saved consent in both the primary and `:pushcore` processes; they do not replace explicit initialization. Keep those providers, the SDK process name and Avvessa's receiver/service intact.
+The SDK's auto-init provider is removed. The primary-process provider restores saved consent without replacing the host's explicit initialization. The private `:pushcore` provider also restores the previously initialized SDK configuration before service work, so vendor notification clicks and independent service-process restarts retain the runtime AppKey. Restoration requires both saved consent and a valid saved configuration. Privacy withdrawal blocks restoration until a subsequent explicit initialization, or an explicit resume on an already initialized client. Keep those providers, the SDK process name and Avvessa's receiver/service intact.
 
 ## Observe and acknowledge
 
