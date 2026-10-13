@@ -1,11 +1,11 @@
-# Changelog
+# 更新日志
 
 ## 1.0.0
 
-- Framework-independent Android and iOS JPush integration, with explicit consent, notification authorization and connection state.
-- Native APIs and UNI legacy, classic UTS and uni-app x adapters using the same native core.
-- Persistent notification events, cold-start recovery, subscription replay and explicit acknowledgement.
-- Alias and tag management, push stop/resume, badge updates and notification cleanup.
-- Foreground presentation rules and temporary context matching without business-specific routing or account logic.
-- Android notification channels, configurable small icons and optional Xiaomi, Huawei, OPPO, vivo, Honor, Meizu and FCM transports.
-- iOS notification actions, text input, APNs lifecycle forwarding and cooperative notification delegates.
+- 提供独立于跨端框架的 Android、iOS 极光推送核心，支持显式隐私同意、通知授权和连接状态查询。
+- 提供原生 API，以及 UNI legacy、经典 UTS、uni-app x 三种接入方式，共用同一套原生核心。
+- 支持通知事件持久化、点击通知冷启动后的事件恢复、订阅重放和显式确认消费。
+- 支持别名与标签管理、停止与恢复推送、角标更新和通知清理。
+- 支持前台通知展示规则和临时上下文匹配，具体业务路由与账号逻辑由接入应用处理。
+- Android 支持通知渠道、自定义通知小图标，以及按需接入小米、华为、OPPO、vivo、荣耀、魅族和 FCM 推送通道。
+- iOS 支持通知操作按钮、文本输入、APNs 生命周期回调转发，以及与宿主通知代理协作。
