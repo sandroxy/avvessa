@@ -9,5 +9,3 @@
 - Foreground presentation rules and temporary context matching without business-specific routing or account logic.
 - Android notification channels, configurable small icons and optional Xiaomi, Huawei, OPPO, vivo, Honor, Meizu and FCM transports.
 - iOS notification actions, text input, APNs lifecycle forwarding and cooperative notification delegates.
-
-Call signaling, VoIP, PushKit and CallKit are outside this package's scope.

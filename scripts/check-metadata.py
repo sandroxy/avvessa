@@ -18,7 +18,7 @@ pins = {item["identity"]: item["state"]["version"] for item in json.loads((root 
 for name in ("jpush", "jcore"):
     if pins[name + "-sdk"] != ios[name]:
         sys.exit(f"{name}: resolved package version differs")
-for filename in ("README.md", "README-EN.md", "BUILDING.md", "RELEASING.md", "CHANGELOG.md", "doc/architecture.md", "doc/contract.md",
+for filename in ("README.md", "README-EN.md", "DEVELOPMENT.md", "RELEASING.md", "CHANGELOG.md", "doc/contract.md",
                  "native/android/README.md", "native/ios/README.md", "THIRD_PARTY_NOTICES.md", "adapters/uniapp/README.md"):
     text = (root / filename).read_text()
     for target in re.findall(r"\]\(([^)]+)\)", text):

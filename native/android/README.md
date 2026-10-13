@@ -1,23 +1,24 @@
 # Android integration
 
-Avvessa supports API 21 and later. Compile the library with JDK 17 and API 36. The base artifact depends on the official native JPush and JCore SDKs and AndroidX Core; it does not require RN, Expo or UNI.
+Avvessa supports API 21 and later. The base artifact depends on the official native JPush and JCore SDKs and AndroidX Core. SDK versions are maintained in [plugin.json](../../plugin.json).
 
 ## Install the native artifact
 
-The Maven Central coordinates for this release are:
+Choose an available version from [GitHub Releases](https://github.com/sandroxy/avvessa/releases) and its Maven Central deployment. Replace `<published-version>` below with that exact version and use it for every Avvessa module:
 
-```gradle
+```groovy
+def avvessaVersion = "<published-version>"
 repositories { google(); mavenCentral() }
 dependencies {
-    implementation "io.github.sandroxy:avvessa:1.0.0"
+    implementation "io.github.sandroxy:avvessa:${avvessaVersion}"
     // Add only the transports configured for this application:
-    // implementation "io.github.sandroxy:avvessa-xiaomi:1.0.0"
+    // implementation "io.github.sandroxy:avvessa-xiaomi:${avvessaVersion}"
 }
 ```
 
-Use the version listed in [GitHub Releases](https://github.com/sandroxy/avvessa/releases) after the corresponding Maven deployment is public. Optional modules are `avvessa-xiaomi`, `avvessa-huawei`, `avvessa-oppo`, `avvessa-vivo`, `avvessa-honor`, `avvessa-meizu` and `avvessa-fcm`; each carries its pinned SDK dependencies. Huawei and Honor additionally require their official Maven repositories, as shown in this repository's `settings.gradle`.
+If the host manages repositories in `settings.gradle`, add repositories there. Optional modules and their additional configuration are listed [below](#optional-manufacturer-transports).
 
-For local source development, `./gradlew publish` in `native/android` writes only to `native/android/build/maven`. Add that directory as a local Maven repository in the consumer. No credentials or remote upload are involved. The [build guide](../../BUILDING.md) describes the toolchain.
+For source builds and local Maven installation, see [DEVELOPMENT.md](../../DEVELOPMENT.md#android-builds-and-tests).
 
 Release AAR mirrors have the same bytes as Maven Central. Keep the POM/Gradle metadata and transitive dependencies; copying a bare AAR is not a complete SDK installation.
 
@@ -45,7 +46,7 @@ New default notification channels use `IMPORTANCE_HIGH`. Previously created chan
 
 Opening the application restores its existing launcher task without clearing its pages. If no such task exists, Avvessa starts the application's declared launcher. This supports hosts whose launcher forwards to another Activity, including notification clicks that JPush has already used to start the host. Server-defined notification destinations are handled by JPush independently of Avvessa's launcher option.
 
-The SDK's auto-init provider is removed. The primary-process provider restores saved consent without replacing the host's explicit initialization. The private `:pushcore` provider also restores the previously initialized SDK configuration before service work, so vendor notification clicks and independent service-process restarts retain the runtime AppKey. Restoration requires both saved consent and a valid saved configuration. Privacy withdrawal blocks restoration until a subsequent explicit initialization, or an explicit resume on an already initialized client. Keep those providers, the SDK process name and Avvessa's receiver/service intact.
+Keep Avvessa's providers, receiver/service and the SDK's `:pushcore` process name in the merged manifest. They restore previously consented configuration when the SDK service restarts. The application must still initialize explicitly; revoking consent prevents background restoration.
 
 ## Observe and acknowledge
 
@@ -70,7 +71,7 @@ Avvessa.Subscription subscription = push.subscribe(new Avvessa.Listener() {
 subscription.remove();
 ```
 
-A subscription holds its listener until removal. Remove Activity-owned listeners when that Activity is destroyed. Acknowledge only after successful application handling; an unacknowledged event can replay after restart. The `true` argument requests pending replay. Full semantics are in the [native contract](../../doc/contract.md).
+A subscription holds its listener until removal. Remove Activity-owned listeners when that Activity is destroyed. The `true` argument requests pending replay. Event fields, acknowledgement and deduplication are defined in the [shared contract](../../doc/contract.md).
 
 ## Permission, channels and presentation
 
@@ -84,7 +85,9 @@ Call `push.refreshState()` after the permission result and after returning from 
 
 Small icons must be notification-compatible drawable or mipmap resources: use a white alpha silhouette on a transparent background, not an adaptive launcher icon. Keep the resource name available across updates; the configuration stores the name instead of a build-specific integer. Android system and vendor renderers can differ. No location, phone, storage, microphone, call or full-screen-intent permission is requested by the base integration.
 
-Set an application icon through `new PushConfiguration.Builder(appKey).smallIcon(R.drawable.ic_stat_notification)`. The bundled bell is used when no custom small icon is selected. Use `.notificationChannel("messages", "Messages")` to choose a channel and `.presentInForeground(false)` to disable local foreground presentation.
+Set the notification small icon through `new PushConfiguration.Builder(appKey).smallIcon(R.drawable.ic_stat_notification)`. Use `.notificationChannel("messages", "Messages")` to choose a channel. A host can also override `jpush_notification_icon`, which the SDK uses during initial construction before Avvessa applies the configured icon.
+
+Some notification-shade styles, including MIUI, display the application icon even when a different small icon is configured. Factory-rendered offline notifications use manufacturer resources and cloud settings; `smallIcon` only affects notifications built inside the application. See [Jiguang's icon guidance](https://docs.jiguang.cn/jpush/practice/set_icon).
 
 The library manifest removes inherited location, phone-state, package-query and external-storage permissions. If another application feature intentionally needs one of those permissions, declare it explicitly in the higher-priority app manifest with `tools:node="merge"`. Inspect the final merged manifest; adding a different SDK is not an application consent decision.
 
@@ -102,9 +105,9 @@ if (Build.VERSION.SDK_INT >= 26) {
 
 Package custom sounds as consumer resources. Channel sound/importance become system-managed after creation; a new value under the same ID does not override user settings. For Android 5–7, the SDK's notification alert settings control sound. `color(int)` takes an actual ARGB color, not a color resource ID.
 
-`presentInForeground(false)` asks the SDK not to display locally handled notifications while the app process is foreground. This is evaluated before local display. It cannot suppress a notification already rendered by a manufacturer's system service. A server-provided channel ID is used when that channel exists locally; otherwise the configured default is used.
+`presentInForeground(false)` suppresses locally handled foreground notifications. Depending on the SDK callback path, the notification is blocked before posting or silenced before posting and then removed; see the [presentation contract](../../doc/contract.md#foreground-policy). A server-provided channel ID is used when that channel exists locally; otherwise the configured default is used.
 
-For selective suppression, pass a validated `NotificationPolicy` and optional `NotificationLifecycle` to the configuration builder:
+For selective suppression, configure `NotificationPolicy` and optional `NotificationLifecycle` before the first initialization, in place of the minimal configuration above:
 
 ```java
 JSONObject rule = new JSONObject().put("activeContext", new JSONObject()
@@ -120,7 +123,7 @@ push.setActiveNotificationContext(new JSONObject().put("id", "conversation-a"));
 push.clearActiveNotificationContext();
 ```
 
-Constructing these JSON objects can throw `JSONException`; handle it alongside invalid configuration. Policy and lifecycle types are immutable copies. Suppression preserves a `notificationReceived` event with presentation metadata. An Application lifecycle observer handles background-to-foreground cleanup without treating Activity navigation as another entry. See the [shared policy contract](../../doc/contract.md#foreground-policy).
+Constructing these JSON objects can throw `JSONException`; handle it alongside invalid configuration. Rules and lifecycle options are immutable. Their matching rules, event behavior and cleanup limits are defined in the [shared policy contract](../../doc/contract.md#foreground-policy).
 
 Native channels also support `setVibrationPattern`, `enableLights`, `setLightColor` and `setShowBadge` before `createNotificationChannel`. Package bitmap icons under Android density directories or supply a vector drawable. For FCM defaults, the host can override `com.google.firebase.messaging.default_notification_icon` and `com.google.firebase.messaging.default_notification_color` resource metadata; the optional module otherwise uses the bundled icon.
 
@@ -128,7 +131,7 @@ Native channels also support `setVibrationPattern`, `enableLights`, `setLightCol
 
 Add only the modules needed by the application. All Avvessa modules must use the same package version.
 
-| Artifact suffix | Required application configuration |
+| Artifact | Required application configuration |
 | --- | --- |
 | `avvessa-xiaomi` | `XIAOMI_APPID`, `XIAOMI_APPKEY` |
 | `avvessa-huawei` | Matching `agconnect-services.json`, AGConnect Gradle configuration, signing fingerprint |
@@ -138,12 +141,9 @@ Add only the modules needed by the application. All Avvessa modules must use the
 | `avvessa-meizu` | `MEIZU_APPID`, `MEIZU_APPKEY` |
 | `avvessa-fcm` | Matching `google-services.json` and Google Services Gradle configuration |
 
-Example for Xiaomi, with values obtained from local Gradle properties:
+For Xiaomi, add the dependency shown above and supply its values from local Gradle properties:
 
 ```groovy
-dependencies {
-    implementation "io.github.sandroxy:avvessa-xiaomi:1.0.0"
-}
 android {
     defaultConfig {
         manifestPlaceholders += [
@@ -164,7 +164,7 @@ The FCM module removes `FirebaseInitProvider`, disables default analytics/data c
 
 Factory offline notification icons and click behavior require manufacturer-specific console/server settings; a local `smallIcon` cannot rewrite a system-rendered offline notification. Keep the SDK's `JNotifyActivity`, `JLocalNotifyActivity` and `JTransitActivity` manifest declarations. The application receives their SDK callbacks through Avvessa.
 
-`getCapabilities().vendorModules` reports included modules only. Validate actual registration and delivery on the target devices.
+`getCapabilities()` returns a `JSONObject`; its `vendorModules` array reports included modules, not registration or delivery status.
 
 ## Other operations
 
@@ -172,10 +172,8 @@ Factory offline notification icons and click behavior require manufacturer-speci
 
 Notification removal uses Android's NotificationManager and remains available after consent withdrawal. Removing all affects this app's delivered notifications, including notifications posted by other features; it does not erase stored events.
 
-Alias APIs: `setAlias`, `getAlias`, `deleteAlias`. Tag APIs: `setTags`, `addTags`, `deleteTags`, `getTags`, `clearTags`, `checkTag`. Each takes a completion callback with a JSON result or `PushException`; asynchronous SDK results time out after 30 seconds.
+Alias APIs: `setAlias`, `getAlias`, `deleteAlias`. Tag APIs: `setTags`, `addTags`, `deleteTags`, `getTags`, `clearTags`, `checkTag`. Each takes a completion callback with a JSON result or `PushException`; input limits and timeout semantics are in the [shared contract](../../doc/contract.md#errors-and-operations).
 
 Use `setConsentGranted(false)` for consent withdrawal. It clears Avvessa's stored events and RegistrationID and asks the SDK to stop. Account logout is an application decision; it does not implicitly mean privacy withdrawal or SDK shutdown.
 
-## Device verification
-
-Use a real AppKey and the signed application registered in the consoles. Record the device model, OS, application ID, RegistrationID, permission and connection state. Manually send a notification and a custom message, then inspect foreground, background, process recreation and notification click behavior. Repeat with each selected manufacturer's offline channel. Build success alone cannot establish any of those outcomes.
+Full Java declarations: [Avvessa](avvessa/src/main/java/com/sandrox/avvessa/Avvessa.java), [PushConfiguration](avvessa/src/main/java/com/sandrox/avvessa/PushConfiguration.java), [PushEvent](avvessa/src/main/java/com/sandrox/avvessa/PushEvent.java) and [PushState](avvessa/src/main/java/com/sandrox/avvessa/PushState.java).

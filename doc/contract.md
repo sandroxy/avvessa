@@ -1,4 +1,6 @@
-# Native contract
+# Push behavior and event contract
+
+This contract defines shared behavior for the native APIs and UNI adapters. Platform setup and API syntax belong to the [Android](../native/android/README.md), [iOS](../native/ios/README.md) and [UNI](../adapters/uniapp/README.md) guides.
 
 ## Initialization and state
 
@@ -53,7 +55,7 @@ Registration and connection changes are state observations, not durable message 
 
 ## Persistence and acknowledgement
 
-Events are persisted before dispatch. Subscription and replay registration are coordinated with insertion. Callbacks run on the main thread and observers must return promptly. Acknowledgement is global to the event store: designate one application consumer to acknowledge work, while diagnostic observers only observe.
+Events are persisted before dispatch. Subscription with replay delivers pending events as well as newly received events. Native callbacks run on the main thread; all subscribers should return promptly. Acknowledgement is global to the event store: designate one application consumer to acknowledge work, while diagnostic observers only observe.
 
 Defaults and limits:
 
@@ -65,6 +67,8 @@ Defaults and limits:
 | Encoded pending payloads | 4 MiB |
 | Deduplication window | 60 seconds |
 | Deduplication identities | At most 5,000 |
+
+Configure count and retention before initialization: Android uses `PushConfiguration.Builder.eventRetention(count, ttlMillis)`; iOS uses `AVPushConfiguration.maxPendingEvents` and `eventRetention` in seconds; UNI uses `maxPendingEvents` and `eventRetentionMilliseconds`.
 
 Count, byte and age eviction removes the oldest applicable events and increments `droppedEvents`. Oversized events fail with `event_too_large`. Storage overhead is additional to the encoded payload limit.
 
@@ -104,10 +108,10 @@ Default suppression reasons are `rule`, `activeContext` and `foregroundDisabled`
 
 Android reports an additional `presentation.method` when suppressed:
 
-- `blocked`: the SDK skipped posting the notification. JPush 6.2.1 invokes its custom pre-display gate when the sender explicitly includes `notification.android.display_foreground: "1"`. The value `"0"` instead applies the SDK's own foreground suppression.
+- `blocked`: the SDK skipped posting the notification. The pinned Android JPush SDK invokes its custom pre-display gate when the sender explicitly includes `notification.android.display_foreground: "1"`. The value `"0"` instead applies the SDK's own foreground suppression.
 - `silentRemoval`: the SDK bypassed that gate, as it does for ordinary payloads without `display_foreground`. Avvessa applies AndroidX per-notification silence before posting, then removes that notification in the SDK receipt/display callback. This prevents the notification from alerting on compliant Android implementations; a short-lived silent entry may still reach notification history or system notification listeners. It is not a guarantee that no notification was ever posted. The removal is independent of optional lifecycle cleanup.
 
-The normal console payload needs no extra field. Both paths preserve the same receipt and freeze the decision before a subsequent page change. A private application-process provider supplies the active context to SDK service-process builders; it does not persist the context or initialize JPush. Custom manufacturer rendering still requires device verification. Notifications displayed entirely by a manufacturer's service do not pass through this local builder. See [AndroidX notification silence](https://developer.android.com/reference/androidx/core/app/NotificationCompat.Builder#setSilent(boolean)) and [JPush payload options](https://docs.jiguang.cn/jpush/server/push/rest_api_v3_push).
+The normal console payload needs no extra field. Both paths preserve the receipt and freeze the decision before a subsequent page change. Notifications displayed entirely by a manufacturer's service bypass this local policy. See [JPush payload options](https://docs.jiguang.cn/jpush/server/push/rest_api_v3_push).
 
 ### Optional lifecycle cleanup
 
@@ -115,11 +119,9 @@ The normal console payload needs no extra field. Both paths preserve the same re
 
 Badge cleanup uses the native badge API, including JPush badge state on iOS. Delivered cleanup removes all of this application's delivered notifications, including notifications from other components. Enable only the operations the host owns. Cleanup does not acknowledge pending events or clear the active context. SDK failures are reported through error observations. These options never grant consent or request notification authorization.
 
-Android's local small icon and foreground policy apply to notifications constructed inside the app. Factory-managed system notifications may use manufacturer resources, categories and cloud settings. Android channel importance and sound are controlled by the system after channel creation; recreating the same ID does not reset the user's settings.
+### Delivery limits
 
-A configured small icon does not force the notification shade to use that image: some system styles, including MIUI, display the application icon there. Check the notification's actual small-icon resource as well as its appearance. See [Jiguang's icon configuration guidance](https://docs.jiguang.cn/jpush/practice/set_icon).
-
-The Android core includes a default `jpush_notification_icon` resource for the SDK's initial notification construction, including hosts without an application icon. The configured `smallIcon` is then applied by Avvessa's notification builder. A host can override the default drawable resource.
+Android icon, channel and manufacturer settings are described in the [Android guide](../native/android/README.md#permission-channels-and-presentation).
 
 iOS only records a background receive event when iOS actually calls the app. Ordinary APNs alerts can be displayed without waking application code. A subsequent click can therefore appear without a preceding receive event in the queue. Silent notifications and force-stopped applications have platform restrictions.
 

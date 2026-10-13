@@ -4,9 +4,9 @@
 
 Avvessa provides native Android and iOS push APIs on top of the official Jiguang SDKs. Initialize with an AppKey, configure APNs or the required Android vendor channels, and consume notifications, custom messages, and notification interactions.
 
-The core has no React Native, Expo, or DCloud dependency. Authentication, account binding, navigation, and server-side sending belong to the application. UNI adapters support legacy nativeplugins, classic UTS, and uni-app x. RN and Flutter APIs are not provided. Incoming-call state, PushKit/CallKit, call controls and call UI belong to a separate calling component and are outside Avvessa's scope.
+Supported integrations are native Android and iOS, UNI legacy, classic UTS, and uni-app x. RN and Flutter APIs are not provided. Authentication, account binding, navigation, and server-side sending belong to the application. Call signaling, PushKit/CallKit, call controls, and call UI are outside Avvessa's scope.
 
-## Native capabilities
+## Capabilities
 
 - Explicit consent and initialization, with separate system notification authorization.
 - RegistrationID, connection and stopped state, notification authorization, and structured errors.
@@ -22,22 +22,21 @@ Persistent connections, APNs, and vendor channels have different delivery condit
 
 ## Integration
 
-| Platform | Minimum OS | Entry point |
-| --- | --- | --- |
-| Android | Android 5.0 / API 21 | [Java / Kotlin guide](native/android/README.md), AAR and Maven metadata |
-| iOS | iOS 13 | [Swift / Objective-C guide](native/ios/README.md), Swift Package Manager or CocoaPods source integration |
-| UNI legacy / UTS / uni-app x | Native core and DCloud host requirements both apply | [Android/iOS integration and packaging](adapters/uniapp/README.md) |
+| Platform | Integration guide |
+| --- | --- |
+| Android | [Java / Kotlin](native/android/README.md): Maven dependencies, notification settings, and optional vendor channels |
+| iOS | [Swift / Objective-C](native/ios/README.md): SPM, XCFramework, APNs, and lifecycle forwarding |
+| UNI legacy / classic UTS / uni-app x | [UNI integration](adapters/uniapp/README.md): installation, consumer configuration, and JavaScript / UTS APIs |
 
 An AppKey does not replace platform setup. iOS requires APNs configuration and signing capabilities matching the Bundle ID. Android vendor channels require the corresponding vendor application settings. Never embed the server-side Master Secret in a client.
 
-Source integration and local build commands are available in this repository. [plugin.json](plugin.json) declares package and SDK versions; a source version is not evidence of publication to a public package registry.
+Choose a version from [GitHub Releases](https://github.com/sandroxy/avvessa/releases) and use the documentation at its tag. [plugin.json](plugin.json) maintains package and SDK versions; each platform guide describes minimum system and host requirements.
 
 - [Event, state, and lifecycle contract](doc/contract.md)
-- [Native architecture](doc/architecture.md)
-- [Local builds and checks](BUILDING.md)
 - [Third-party dependencies and privacy resources](THIRD_PARTY_NOTICES.md)
-- [Release preparation and publication](RELEASING.md)
 - [Changelog](CHANGELOG.md)
+
+Development and maintenance: [architecture, builds, and checks](DEVELOPMENT.md) · [publication](RELEASING.md).
 
 ## License
 

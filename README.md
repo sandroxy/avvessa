@@ -4,9 +4,9 @@
 
 Avvessa 是基于极光官方原生 SDK 的通用推送组件，提供 Android 和 iOS 原生接口。应用通过 AppKey 初始化，按需配置 APNs 或 Android 厂商通道，接收通知、自定义消息和点击事件。
 
-核心不依赖 React Native、Expo 或 DCloud，不处理登录、账号绑定、页面路由或服务端发送。UNI 提供 legacy、UTS、uni-app x 三种接入方式；RN、Flutter 接口当前未提供。来电状态机、PushKit／CallKit、接听挂断和通话界面属于独立的通话组件，不在 Avvessa 的范围内。
+支持 Android、iOS 原生，以及 UNI legacy、经典 UTS、uni-app x；RN、Flutter 接口未提供。登录、账号绑定、页面路由和服务端发送由应用负责。来电信令、PushKit／CallKit、接听挂断和通话界面不在 Avvessa 的范围内。
 
-## 原生能力
+## 能力
 
 - 显式隐私同意与初始化，独立的系统通知授权操作。
 - RegistrationID、连接、停止状态、通知授权及结构化错误。
@@ -22,22 +22,21 @@ Avvessa 是基于极光官方原生 SDK 的通用推送组件，提供 Android �
 
 ## 接入
 
-| 平台 | 最低系统 | 入口 |
-| --- | --- | --- |
-| Android | Android 5.0 / API 21 | [Java / Kotlin 接入](native/android/README.md)，AAR 与 Maven 元数据 |
-| iOS | iOS 13 | [Swift / Objective-C 接入](native/ios/README.md)，Swift Package Manager 或 CocoaPods 源码依赖 |
-| UNI legacy / UTS / uni-app x | 同时满足原生核心及 DCloud 宿主要求 | [双端接入与打包](adapters/uniapp/README.md) |
+| 平台 | 接入入口 |
+| --- | --- |
+| Android | [Java / Kotlin](native/android/README.md)：Maven 依赖、通知配置、可选厂商通道 |
+| iOS | [Swift / Objective-C](native/ios/README.md)：SPM、XCFramework、APNs 与生命周期 |
+| UNI legacy / 经典 UTS / uni-app x | [UNI 接入](adapters/uniapp/README.md)：安装、消费配置与 JavaScript / UTS API |
 
 AppKey 不替代平台配置：iOS 需要匹配 Bundle ID 的 APNs 配置和签名能力；Android 厂商通道需要对应厂商应用参数。服务端 Master Secret 不进入客户端。
 
-本仓的源码接入和本机构建入口可直接使用。包版本与 SDK 依赖由 [plugin.json](plugin.json) 声明；不要把源码版本号当作已发布到公共包仓库的证明。
+从 [GitHub Releases](https://github.com/sandroxy/avvessa/releases) 选择发布版本，并使用对应 tag 的文档。包版本与 SDK 依赖由 [plugin.json](plugin.json) 维护，最低系统和宿主要求见各平台接入指南。
 
 - [事件、状态与生命周期契约](doc/contract.md)
-- [原生架构](doc/architecture.md)
-- [本地构建与检查](BUILDING.md)
 - [第三方依赖与隐私资源](THIRD_PARTY_NOTICES.md)
-- [Release preparation and publication](RELEASING.md)
-- [Changelog](CHANGELOG.md)
+- [版本变化](CHANGELOG.md)
+
+开发与维护：[架构、构建和检查](DEVELOPMENT.md) · [发布流程](RELEASING.md)。
 
 ## 许可证
 

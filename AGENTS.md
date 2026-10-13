@@ -2,6 +2,7 @@
 
 - Tracked files must be suitable for this public repository: maintained implementation, public contracts, consumer documentation, build tools, and relevant tests.
 - Keep investigation, plans, progress, private references, and temporary verification records in the ignored `doc/dev/` directory. Never force-add it or link public documentation to it.
+- Keep user guides focused on integration and public behavior. Maintain development details in `DEVELOPMENT.md`, publication rules in `RELEASING.md`, and user-visible version changes in `CHANGELOG.md`. Link to the authoritative source instead of duplicating it; move useful information before deleting a document.
 - Name code and documents by responsibility. Do not encode stages, priorities, or replacement history in names. Semantic package versions and external protocol versions remain explicit.
 - Android/iOS cores depend on the platform and official Jiguang SDKs, not React Native, Expo, or DCloud. Adapters own framework-specific integration.
 - Business authentication, account binding, routes, payload interpretation, and sending services belong to consumers.

@@ -1,10 +1,10 @@
-# Release preparation and publication
+# Releasing
 
-Avvessa publishes native Android/iOS and UNI legacy, classic UTS and uni-app x. Versions come from `plugin.json`; the annotated Git tag is the exact stable SemVer, without `v`. Android coordinates use `io.github.sandroxy`; the UNI module is `Sandrox-Avvessa`. React Native, npm and Flutter are not publication targets.
+Package identity, version and supported integrations are maintained in [plugin.json](plugin.json). Release requirements, artifact roles and acceptance targets are maintained in [release-policy.json](release-policy.json). The annotated Git tag is the exact stable SemVer, without `v`.
 
 ## Prepare locally
 
-Use Xcode, JDK 17 or later, Android SDK 36, Python 3, Ruby, GnuPG and the pinned official DCloud SDKs. The regular build checks are in [BUILDING.md](BUILDING.md). DCloud SDKs are compile inputs only and are never redistributed. Signing is handled by a locally configured GPG identity; do not place private keys or passwords in this repository. Central Portal does not need an API token for the manual upload flow.
+Use the toolchains and checks in [DEVELOPMENT.md](DEVELOPMENT.md), plus Ruby and GnuPG. DCloud SDKs are compile inputs and are not redistributed. Configure the signing identity in GPG; keep private keys and passwords outside the repository. The manual Central Portal upload needs no API token.
 
 Start from committed, clean product source. Keep `plugin.json`, UNI `package.json` and [CHANGELOG.md](CHANGELOG.md) consistent. Resolve the root Swift package's official dependencies into an ignored Xcode `SourcePackages` directory, then run:
 
@@ -16,19 +16,19 @@ python3 scripts/prepare-release.py \
   --signing-fingerprint '<full public GPG fingerprint>'
 ```
 
-The command builds all eight Maven modules with POM, Gradle metadata, source and documentation jars, signs each payload and verifies its signature. It builds the iOS device frameworks once for both UNI packages and the native XCFramework. Simulator slices are built separately. It checks that embedded core/vendor AARs match Maven bytes and that the UNI iOS core matches the XCFramework device slice.
+The command builds and signs the Maven modules with POM, Gradle metadata, source and documentation jars. It builds the iOS device frameworks for both UNI packages and the native XCFramework, plus separate simulator slices. It verifies signatures and consistency of the native binaries embedded in each package.
 
-The two UNI archives are `avvessa-uniapp-<version>.zip` (UTS) and `avvessa-uniapp-legacy-<version>.zip`. Each has `package.json` at its root; extract into `uni_modules/Sandrox-Avvessa` or `nativeplugins/Sandrox-Avvessa`. Both include the same inactive optional Android vendor kit. Consumer AppKeys, service JSON, signing and DCloud authorization remain outside distribution archives.
+Both UNI archives include the same inactive optional Android vendor kit. Consumer AppKeys, service JSON, signing and DCloud authorization stay outside distribution archives. Consumer installation is described in the [UNI guide](adapters/uniapp/README.md#安装).
 
-The output is `dist/candidate.json` plus the files it names. The independent contract is [release-policy.json](release-policy.json). `--rehearsal` allows dirty source and omitted signing for local build checks, writes under `dist/rehearsal`, and explicitly produces no acceptance-eligible candidate. Never treat that output as a formal release. A formal candidate protects itself from another preparation overwriting its files. Preserve a failed or superseded candidate separately before explicitly preparing a replacement; do not alter accepted bytes.
+The output is `dist/candidate.json` and its referenced files. `--rehearsal` permits uncommitted source and omitted signing for local checks, writes under `dist/rehearsal`, and cannot be used as a formal candidate. Preparation refuses to overwrite an existing formal candidate; preserve it separately before preparing a replacement. Once accepted, publish those exact files without rebuilding, re-signing or repacking.
 
 ## Verify the frozen candidate
 
-The separate integration repository registers the same artifact roles and eight automated targets. Its resolver verifies file lengths, SHA-256, candidate identity, source state and the independently registered matrix. Run its `verification/run-acceptance.rb --candidate /absolute/path/to/candidate.json --target <target>` from a clean verifier commit. Targets are `android`, `ios`, and `uniapp-{legacy,uts,x}-{android,ios}`.
+Use the separate verifier repository named in the release policy. Its `verification/avvessa/README.md` owns consumer preparation, target commands, device procedures and acceptance receipt generation. Its independent registry must match the product release policy.
 
-Candidate consumers use the frozen Maven repository, local source SPM ZIP, XCFramework and UNI archives. The source ZIP and its checksum stay local; published consumers obtain source from the release Git tag and verify its commit and complete source digest against the public native manifest. Neither path substitutes the current product checkout. Compilation, callback generation and dependency linkage do not prove push delivery. Record actual device evidence for the eight corresponding `*-push-device` targets; reuse earlier observations only with an explicit applicability review of native bytes, wrappers, consumer configuration and scenario coverage. Never describe reused evidence as fresh device testing.
+Acceptance binds the source commit, artifact bytes and required checks. Build results do not establish push delivery; the required device observations must cover the relevant configuration and scenarios. Earlier results may be reused only after reviewing implementation equivalence and applicability, with their original provenance retained.
 
-After all required checks have passed, the integration repository's `verification/record-acceptance.rb` produces an accepted receipt. Create the annotated tag on exactly the candidate's source commit only after acceptance. Publication tooling requires that tag, clean source, matching receipt and verified signatures:
+After acceptance, create the annotated tag on exactly the candidate's source commit. Publication verification requires that tag, clean source, a matching receipt and valid signatures:
 
 ```sh
 ruby scripts/verify-publish-candidate.rb \
@@ -36,7 +36,7 @@ ruby scripts/verify-publish-candidate.rb \
   --acceptance /absolute/path/to/accepted.json
 ```
 
-`publish-accepted.rb` accepts the same paths plus `--channel github|maven|uniapp`. It only prints the exact files and manual steps. It does not authenticate, upload, publish or rebuild anything. Login, security keys and publication actions remain with the operator.
+If the working branch has moved beyond the release commit, pass `--source /absolute/path/to/clean-tag-checkout`. `scripts/publish-accepted.rb` accepts the same options plus `--channel github|maven|uniapp` and prints the files and manual steps for that destination. These commands verify local inputs; they do not upload or publish.
 
 ## Publish accepted files
 
@@ -50,4 +50,4 @@ Before the first publication, inspect existing GitHub tags/assets, Central coord
 
 The public workflows use manual dispatch only; creating a tag or Release does not automatically publish other channels. They never build a replacement artifact and require no private-repository workflow.
 
-After the public downloads and marketplace import are confirmed, update only Avvessa in the integration repository's stable lock with the actual URLs, lengths and hashes. Keep it `unpublished` until then. Report GitHub, Central, SPM resolution and market review/import independently. Ordinary documentation changes after release go to the default branch; package content changes require a new version.
+Confirm GitHub downloads, Central coordinates, SPM tag resolution and marketplace import before promoting the verifier's stable lock. Ordinary documentation corrections go to the default branch. Published tags and files stay unchanged; changes to distributed package contents require a new version.

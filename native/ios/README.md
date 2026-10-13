@@ -4,7 +4,7 @@ Avvessa supports iOS 13 and later and exposes Objective-C and Swift APIs. It dir
 
 ## Install
 
-In Xcode, add `https://github.com/sandroxy/avvessa.git` with the exact published version `1.0.0`, then select the `Avvessa` product. Tags have no `v` prefix. This is a source Swift package: it compiles the core and resolves the exact official SDK versions declared in `Package.swift`. Commit the consumer's `Package.resolved`.
+In Xcode, add `https://github.com/sandroxy/avvessa.git`, select an exact version from [GitHub Releases](https://github.com/sandroxy/avvessa/releases), then select the `Avvessa` product. Tags have no `v` prefix. This source Swift package compiles the core and resolves the official SDK versions declared in [Package.swift](../../Package.swift). Commit the consumer's `Package.resolved`.
 
 For local development, add the repository root as a local Swift package. To stage a published version locally, check out its Git tag or extract GitHub's automatic **Source code** archive for that tag. Initial SDK resolution still needs network access.
 
@@ -23,7 +23,7 @@ end
 
 `AVVESSA_SOURCE` is the checkout's absolute directory, supplied locally. Select one dependency manager per app target. Do not add another JPush framework wrapper or initialize JPush separately.
 
-The package bundles the pinned SDKs' combined privacy declarations as a resource. Check the application's archive for `PrivacyInfo.xcprivacy` before distribution. The application retains responsibility for its own privacy manifest and disclosures.
+Check the application's archive for the bundled `PrivacyInfo.xcprivacy` before distribution. Its contents and the application's own disclosure responsibilities are described in [third-party notices](../../THIRD_PARTY_NOTICES.md#ios-privacy-resources).
 
 ## Configure the application
 
@@ -139,22 +139,24 @@ A click response is persisted as `notificationOpened`; dismiss actions use `noti
 
 ## Presentation and notification controls
 
-`foregroundPresentationOptions` configures native foreground presentation before delivery to observers. The default requests alert/sound/badge on iOS 13 and list/banner/sound/badge on newer systems. An empty option set suppresses foreground presentation for owned notifications.
+`AVPushConfiguration.foregroundPresentationOptions` configures native foreground presentation before initialization. The default requests alert/sound/badge on iOS 13 and list/banner/sound/badge on newer systems. An empty option set suppresses foreground presentation for owned notifications.
 
-Configure selective rules and cleanup before initialization, then update context as the host screen changes:
+For selective rules and cleanup, use this configuration in place of the minimal initialization above, then update context as the host screen changes:
 
 ```swift
+let configuration = AVPushConfiguration(appKey: appKeyFromLocalConfiguration, production: false)
 configuration.presentationPolicy = try AVNotificationPolicy(dictionary: [
     "activeContext": ["match": ["kind": "chat"], "idField": "conversationId"]
 ])
 configuration.notificationLifecycle = try AVNotificationLifecycle(dictionary: ["clearBadgeOnOpen": true])
+try push.initialize(with: configuration, launchOptions: launchOptions)
 // After initialization, on entering the relevant screen:
 try push.setActiveNotificationContext(["id": "conversation-a"])
 // On leaving or hiding it:
 push.clearActiveNotificationContext()
 ```
 
-Rules suppress the foreground banner and sound while preserving receipt events and the configured badge option. Context is transient. All lifecycle cleanup options are opt-in. See the [shared policy contract](../../doc/contract.md#foreground-policy) for limits and foreground/background semantics.
+Matching, context lifetime, presentation results and opt-in cleanup are defined in the [shared policy contract](../../doc/contract.md#foreground-policy).
 
 Notification icons use the application's iOS app icon. Include custom sounds in the host app bundle and request their file names in the APNs payload. Categories registered through `setNotificationCategories` are merged by identifier with existing system categories; a host category using the same identifier is replaced.
 
@@ -168,8 +170,4 @@ Other APIs:
 
 The delivered-notification removal methods act on this app's notification center, including notifications from other features when removing all. Clearing delivered notifications does not acknowledge events. Clearing event storage does not remove delivered notifications.
 
-## Device verification
-
-Use a signed physical device build with the intended APNs entitlement and Jiguang configuration. Inspect RegistrationID and authorization before manually sending from the console. Check foreground presentation, background alert display, notification clicks after process recreation, custom messages while connected, acknowledgement/replay, and stop/resume behavior.
-
-Simulator compilation confirms only the simulator binary path. It cannot establish APNs configuration, real-device SDK registration, offline delivery or App Store acceptance.
+Full Objective-C declarations and Swift names are in [Avvessa.h](Sources/Avvessa/include/Avvessa.h). Storage limits, errors and asynchronous operation deadlines are defined in the [shared contract](../../doc/contract.md).
