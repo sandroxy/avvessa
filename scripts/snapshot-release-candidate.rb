@@ -25,6 +25,7 @@ OptionParser.new do |parser|
   parser.on("--commit SHA") { |value| options[:commit] = value }
   parser.on("--dirty BOOLEAN") { |value| options[:dirty] = value }
   parser.on("--root PATH") { |value| options[:root] = value }
+  parser.on("--output-dir PATH", "Directory below the source repository's dist/") { |value| options[:output_dir] = value }
   parser.on("--state STATE") { |value| options[:state] = value }
   parser.on("--automated-target TARGET") { |value| options[:automated_targets] << value }
   parser.on("--manual-target TARGET") { |value| options[:manual_targets] << value }
@@ -97,12 +98,14 @@ provided_acceptance = {
 abort("Candidate acceptance matrix differs from release policy") unless
   provided_acceptance == policy.fetch("acceptance")
 
-dist_root = root.join("dist")
-abort("Release output directory must not be a symbolic link") if dist_root.symlink?
+dist_root = Pathname.new(options.fetch(:output_dir, root.join("dist"))).expand_path
+abort("Release output must stay below dist/") unless dist_root.to_s.start_with?(root.join("dist").to_s + "/") || dist_root == root.join("dist")
+dist_root.ascend { |path| abort("Release output directory must not traverse symbolic links") if path.symlink? }
 FileUtils.mkdir_p(dist_root)
 manifest_path = dist_root.join("candidate.json")
 abort("Candidate manifest must be a regular file") if
   manifest_path.symlink? || (manifest_path.exist? && !manifest_path.file?)
+abort("A frozen candidate already exists; preserve it before preparing another") if manifest_path.exist?
 
 role_sources = options.fetch(:artifacts).map do |argument|
   role, raw_path = argument.split("=", 2)

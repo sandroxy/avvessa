@@ -33,7 +33,7 @@ Check the application's archive for the bundled `PrivacyInfo.xcprivacy` before d
 4. Pass `production: false` for the APNs development environment, or `true` for production. Match the actual signing entitlement; build configuration names alone do not establish the APNs environment.
 5. If the application handles background remote notifications, enable Background Modes → Remote notifications. Ordinary alert display does not imply background execution.
 
-Keep APNs private keys and the Jiguang Master Secret outside client source. No PushKit, CallKit, microphone or tracking authorization is required by this integration.
+Keep APNs private keys and the Jiguang Master Secret outside client source.
 
 ## Initialize and observe
 

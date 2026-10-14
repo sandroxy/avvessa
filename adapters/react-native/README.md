@@ -1,14 +1,18 @@
 # Avvessa React Native 接入
 
-React Native 适配器尚未发布到 npm；源码使用方式见 [开发文档](../../DEVELOPMENT.md#react-native)。设计基线为 React Native 0.81，包含旧桥与 TurboModule 入口。最低系统取 RN、Avvessa 及所选厂商 SDK 的共同要求，当前 RN 基线为 Android API 24、iOS 15.1。Expo 需要包含原生插件的开发构建，Expo Go 不包含 Avvessa。
+通过 npm 包 `@sandrox/avvessa` 为 React Native 接入极光推送，包含旧桥与 TurboModule 入口。支持 React Native 0.81 起的宿主，Expo 基线为 SDK 54；更新的 RN／Expo 版本仍须按应用依赖验证兼容性。最低系统取 RN、Avvessa 及所选厂商 SDK 的共同要求，当前 RN 基线为 Android API 24、iOS 15.1。Expo 需要包含原生插件的开发构建，Expo Go 不包含 Avvessa。
 
-提供普通通知、自定义消息、点击事件、事件持久化和展示控制；不包含 PushKit、CallKit、来电界面或通话控制。业务账号、路由、隐私同意时机与服务端发送由应用负责。
+提供普通通知、自定义消息、点击事件、事件持久化和展示控制。业务账号、路由、隐私同意时机与服务端发送由应用负责。
 
-## 依赖
+## 安装
 
-完整 RN 包由本目录及其声明的共享输入组成；不能直接把本目录模板作为完整 npm 包安装。安装后由 RN 自动链接 Android 模块与 `AvvessaReactNative` Pod。
+```sh
+npm install @sandrox/avvessa
+```
 
-Android 使用 Avvessa Maven 核心，厂商模块按需选择；源码开发可使用明确准备的本地 AAR。iOS 使用同一核心的源码和隐私资源，由 CocoaPods 链接元数据锁定的官方 JPush／JCore。不要同时链接另一份 Avvessa、`jpush-react-native` 或另一套手动初始化的 JPush。
+安装后由 RN 自动链接 Android 模块与 `AvvessaReactNative` Pod。普通 RN 项目完成下方原生配置后运行 `npx pod-install` 并重新构建应用。Expo 项目先填写下一节配置，再运行 `npx expo prebuild` 和 `npx expo run:android`／`npx expo run:ios`。
+
+Android 使用 Avvessa Maven 核心，厂商模块按需选择。iOS 使用同一核心的源码和隐私资源，由 CocoaPods 链接元数据锁定的官方 JPush／JCore。不要同时链接另一份 Avvessa、`jpush-react-native` 或另一套手动初始化的 JPush。
 
 普通 RN 不依赖 ExpoModulesCore。Expo 项目额外链接 `AvvessaExpo`，自动转发应用启动及 APNs 回调。若应用用 `expo-notifications` 处理其他通知，可保留它；Avvessa 消息只应由一个业务消费者处理，避免重复执行或再创建本地通知。
 
@@ -22,14 +26,13 @@ Android 使用 Avvessa Maven 核心，厂商模块按需选择；源码开发可
   android: {
     vendors: [],
     vendorProperties: {},
-    notificationIcon: './assets/push-small.xml',
   },
 }]
 ```
 
 `apnsEnvironment` 必须匹配签名中的 APNs entitlement：开发签名为 `development`，分发签名为 `production`。插件增加 `aps-environment` 和后台 `remote-notification`；不决定用户同意时机，也不自动申请通知权限。
 
-`notificationIcon` 可省略。提供透明背景的单色 vector XML 或 PNG 后，生成资源名为 `drawable/avvessa_notification_custom`；初始化时在 `android.smallIcon` 中使用该名字，通过 `android.color` 指定颜色。系统或厂商通知样式仍可能展示应用图标。
+如需小图标，在 `android.notificationIcon` 填入本项目已有资源路径，例如 `./assets/push-small.xml`。提供透明背景的单色 vector XML 或 PNG 后，生成资源名为 `drawable/avvessa_notification_custom`；初始化时在 `android.smallIcon` 中使用该名字，通过 `android.color` 指定颜色。系统或厂商通知样式仍可能展示应用图标。
 
 `android.vendors` 只选择需要的模块，`android.vendorProperties` 只填写对应字符串参数：
 
@@ -49,13 +52,14 @@ Android 使用 Avvessa Maven 核心，厂商模块按需选择；源码开发可
 
 ## 普通 RN 原生配置
 
-Android 自动链接后无需修改 Activity 的通知点击入口。基础权限、接收器及通知入口来自原生核心 Manifest。厂商模块在 `gradle.properties` 中通过 `avvessaVendorModules=xiaomi,huawei` 选择，再按 [Android 厂商配置](../../native/android/README.md#optional-manufacturer-transports)填写占位符、仓库和服务文件。小图标放在宿主 `res/drawable`，初始化时填写资源名。
+Android 自动链接后无需修改 Activity 的通知点击入口。基础权限、接收器及通知入口来自原生核心 Manifest。厂商模块在 `gradle.properties` 中通过 `avvessaVendorModules=xiaomi,huawei` 选择，再按 [Android 厂商配置](https://github.com/sandroxy/avvessa/blob/main/native/android/README.md#optional-manufacturer-transports)填写占位符、仓库和服务文件。小图标放在宿主 `res/drawable`，初始化时填写资源名。推送本身不需要定位、电话状态或存储读取权限；核心移除这些 SDK 可选权限，宿主仍应检查最终合并清单。
 
 iOS AppDelegate 导入 `AvvessaReactNative`，在已有回调中加入下列调用，不要重复定义同名回调：
 
 | 宿主回调 | Swift 转发调用 |
 | --- | --- |
 | 应用启动，启动 React 之前 | `AVReactNativeLifecycle.shared.launch(launchOptions)` |
+| 应用回到前台 | `AVReactNativeLifecycle.shared.activate()` |
 | APNs 注册成功 | `AVReactNativeLifecycle.shared.registerDeviceToken(deviceToken)` |
 | APNs 注册失败 | `AVReactNativeLifecycle.shared.registrationFailed(error as NSError)` |
 | 后台远程通知 | `AVReactNativeLifecycle.shared.receive(userInfo)` |
@@ -66,7 +70,7 @@ iOS AppDelegate 导入 `AvvessaReactNative`，在已有回调中加入下列调�
 
 ## 初始化与事件消费
 
-完整方法与参数见 [TypeScript 声明](../uniapp/js_sdk/index.d.ts)，语义以 [公共契约](../../doc/contract.md)为准。RN 和 UNI 使用同一套 JSON 命令与错误码。
+完整方法与参数见 [TypeScript 声明](https://github.com/sandroxy/avvessa/blob/main/adapters/uniapp/js_sdk/index.d.ts)，语义以 [公共契约](https://github.com/sandroxy/avvessa/blob/main/doc/contract.md)为准。RN 和 UNI 使用同一套 JSON 命令与错误码。
 
 ```js
 import * as push from '@sandrox/avvessa';
@@ -121,4 +125,8 @@ useEffect(() => {
 
 `notificationLifecycle` 可选控制初始化、回前台、点击通知时的角标或通知清理，默认关闭。运行时的 `clearNotifications`、`clearPendingEvents`、`acknowledge` 分别操作已展示通知、全部待消费事件及单条事件消费状态。
 
-`stopPush`／`resumePush` 控制 SDK 推送，`unsubscribe` 只控制观察者。撤回同意使用 `setConsentGranted(false)`；重新同意后显式初始化或恢复。别名、标签及后端设备绑定由宿主按业务管理。SDK 原始消息类型按公共契约保留，不增加语聊处理。
+`stopPush`／`resumePush` 控制 SDK 推送，`unsubscribe` 只控制观察者。撤回同意使用 `setConsentGranted(false)`；重新同意后显式初始化或恢复。别名、标签及后端设备绑定由宿主按业务管理。SDK 原始消息类型按公共契约保留。
+
+## iOS 通知动作
+
+使用 `setNotificationCategories` 注册动作类别，再在服务端 iOS 通知的 `category` 填入相同标识；不要把它放进业务附加字段。按钮点击产生 `notificationOpened`，`event.action.identifier` 是所注册的动作 ID；文字回复还包含 `event.action.userText`。插件交付动作与文字，实际业务回复由应用处理。类别、动作选项及完整字段见公共契约的 [iOS notifications](https://github.com/sandroxy/avvessa/blob/main/doc/contract.md#notifications-and-platform-limits)。

@@ -3,7 +3,7 @@
 import argparse
 import json
 from pathlib import Path
-from release_artifacts import MODULES, sha, read_zip, verify_packages
+from release_artifacts import MODULES, sha, read_zip, verify_packages, verify_react_native
 
 
 def verify(args):
@@ -28,6 +28,24 @@ def verify(args):
         for module in MODULES:
             role='native-android-'+('core' if module=='avvessa' else module[8:])+'-aar'
             if sha(directory/f'{module}-{version}.aar')!=manifest['artifacts'][role]:raise ValueError('Maven mirror differs from accepted AAR')
+        if args.channel == 'npm':
+            if not args.source:
+                raise ValueError('npm verification requires the release tag checkout')
+            import hashlib
+            tag_type = subprocess.check_output(['git', '-C', str(args.source), 'cat-file', '-t', 'refs/tags/'+version], text=True).strip()
+            tag_commit = subprocess.check_output(['git', '-C', str(args.source), 'rev-list', '-n', '1', 'refs/tags/'+version], text=True).strip()
+            if tag_type != 'tag' or tag_commit != commit:
+                raise ValueError('npm source must be the annotated release tag')
+            names = subprocess.check_output(['git', '-C', str(args.source), 'ls-files', '-z'], text=True).split('\0')
+            source = {name: (args.source/name).read_bytes() for name in sorted(filter(None, names))}
+            digest = hashlib.sha256(''.join(name+'\t'+hashlib.sha256(content).hexdigest()+'\n' for name, content in source.items()).encode()).hexdigest()
+            if digest != manifest['source']['inputSha256']:
+                raise ValueError('Release source content differs from accepted inputs')
+            package = directory/f'sandrox-avvessa-{version}.tgz'
+            expected = manifest['artifacts']['react-native-package']
+            if sha(package) != expected or Path(str(package)+'.sha256').read_text().strip() != expected+'  '+package.name:
+                raise ValueError('npm tarball/checksum differs from accepted bytes')
+            verify_react_native(package, version, source)
         if args.channel=='uniapp':
             native_ios=directory/f'avvessa-{version}.xcframework.zip'
             if sha(native_ios)!=manifest['artifacts']['native-ios-xcframework']:raise ValueError('Public XCFramework differs from accepted bytes')
@@ -58,7 +76,7 @@ def verify(args):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--candidate',type=Path);p.add_argument('--version');p.add_argument('--artifacts',type=Path);p.add_argument('--source',type=Path);p.add_argument('--channel',choices=['android','uniapp']);p.add_argument('--uts-sha256');p.add_argument('--legacy-sha256')
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--candidate',type=Path);p.add_argument('--version');p.add_argument('--artifacts',type=Path);p.add_argument('--source',type=Path);p.add_argument('--channel',choices=['android','npm','uniapp']);p.add_argument('--uts-sha256');p.add_argument('--legacy-sha256')
     args=p.parse_args()
     if not args.candidate and not all((args.version,args.artifacts,args.channel)):p.error('Choose --candidate, or --version/--artifacts/--channel')
     try:verify(args)

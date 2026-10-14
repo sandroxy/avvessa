@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "avvessa",
   "displayName": "Avvessa",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "repository": "https://github.com/sandroxy/avvessa.git",
   "license": "Apache-2.0",
   "native": {
@@ -39,6 +39,14 @@
         "uni-app",
         "uni-app-x"
       ]
+    },
+    "reactNative": {
+      "package": "@sandrox/avvessa",
+      "sourceRoot": "adapters/react-native",
+      "minimumReactNative": "0.81.0",
+      "minimumAndroidSdk": 24,
+      "minimumIOSVersion": "15.1",
+      "expoSdk": "54"
     }
   }
 }

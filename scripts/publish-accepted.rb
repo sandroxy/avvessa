@@ -7,7 +7,7 @@ require "shellwords"
 
 options = {}
 OptionParser.new do |parser|
-  parser.banner = "Usage: publish-accepted.rb --candidate FILE --acceptance FILE --channel github|maven|uniapp [--source DIR]"
+  parser.banner = "Usage: publish-accepted.rb --candidate FILE --acceptance FILE --channel github|maven|npm|uniapp [--source DIR]"
   parser.separator "Verifies the accepted files and prints manual publication steps; never uploads or publishes."
   parser.on("--candidate FILE") { |value| options[:candidate] = value }
   parser.on("--acceptance FILE") { |value| options[:acceptance] = value }
@@ -17,7 +17,7 @@ OptionParser.new do |parser|
 end.parse!
 abort("All three options are required") unless %i[candidate acceptance channel].all? { |key| options[key] }
 abort("Unexpected arguments") unless ARGV.empty?
-abort("Unknown publication channel") unless %w[github maven uniapp].include?(options[:channel])
+abort("Unknown publication channel") unless %w[github maven npm uniapp].include?(options[:channel])
 gate_arguments = [
   RbConfig.ruby, "#{__dir__}/verify-publish-candidate.rb", "--candidate", options[:candidate],
   "--acceptance", options[:acceptance]
@@ -37,7 +37,7 @@ when "github"
   puts "In https://github.com/sandroxy/avvessa/releases select the existing tag #{version}."
   puts "Title: Avvessa #{version}. Use a short summary and link to the tag's CHANGELOG.md."
   puts "Attach only these initial GitHub Release files:"
-  %w[native-ios-xcframework native-build-manifest
+  %w[native-ios-xcframework native-build-manifest react-native-package checksum-react-native-package
      uniapp-legacy-package checksum-uniapp-legacy-package uniapp-uts-package checksum-uniapp-uts-package].each do |role|
     puts path.call(role)
   end
@@ -51,6 +51,12 @@ when "maven"
   puts "It contains io.github.sandroxy:avvessa:#{version} and the seven optional avvessa-<vendor> modules."
   puts "Once all eight coordinates are publicly available, run GitHub Actions > Mirror Android AAR with version=#{version}."
   puts "Run the workflow from the updated default branch; it reads the existing release tag and never rebuilds."
+when "npm"
+  puts "After GitHub Release and all required Maven coordinates are public, publish this exact accepted tarball:"
+  puts Shellwords.join(["npm", "publish", path.call("react-native-package"), "--access", "public", "--ignore-scripts", "--registry", "https://registry.npmjs.org/"])
+  puts "For later versions configure npm Trusted Publishing: GitHub owner sandroxy, repository avvessa, workflow publish-npm.yml."
+  puts "Then manually run Publish npm with version=#{version}; it downloads and verifies the existing Release tarball without rebuilding."
+  puts "Never publish from the adapter template directory or publish a placeholder to reserve the version."
 when "uniapp"
   puts "Accepted UTS archive: #{path.call('uniapp-uts-package')}"
   puts "In the accepted artifact-only consumer project, right-click uni_modules/Sandrox-Avvessa in HBuilderX and choose 发布到插件市场."

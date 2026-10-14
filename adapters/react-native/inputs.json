@@ -8,5 +8,6 @@
   "adapters/uniapp/js_sdk/index.d.ts": "shared/javascript/index.d.ts",
   "native/ios/Sources/Avvessa": "ios/Core/Avvessa",
   "plugin.json": "avvessa-native.json",
-  "LICENSE": "LICENSE"
+  "LICENSE": "LICENSE",
+  "CHANGELOG.md": "CHANGELOG.md"
 }

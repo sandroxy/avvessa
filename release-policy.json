@@ -23,6 +23,7 @@
       "checksum-native-android-xiaomi-aar",
       "checksum-native-ios-spm-source",
       "checksum-native-ios-xcframework",
+      "checksum-react-native-package",
       "checksum-uniapp-legacy-package",
       "checksum-uniapp-uts-package",
       "native-android-core-aar",
@@ -37,6 +38,7 @@
       "native-build-manifest",
       "native-ios-spm-source",
       "native-ios-xcframework",
+      "react-native-package",
       "uniapp-legacy-package",
       "uniapp-uts-package"
     ],
@@ -46,6 +48,8 @@
     "automatedTargets": [
       "android",
       "ios",
+      "react-native-android",
+      "react-native-ios",
       "uniapp-legacy-android",
       "uniapp-legacy-ios",
       "uniapp-uts-android",
@@ -56,6 +60,8 @@
     "manualTargets": [
       "native-android-push-device",
       "native-ios-push-device",
+      "react-native-android-push-device",
+      "react-native-ios-push-device",
       "uniapp-legacy-android-push-device",
       "uniapp-legacy-ios-push-device",
       "uniapp-uts-android-push-device",

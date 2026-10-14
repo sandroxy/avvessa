@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path, PurePosixPath
 import stat
+import tarfile
 import zipfile
 
 VENDORS = ('fcm','honor','huawei','meizu','oppo','vivo','xiaomi')
@@ -41,11 +42,61 @@ def read_zip(path):
     return archive
 
 
+def read_npm(path):
+    files = {}
+    with tarfile.open(path, 'r:gz') as archive:
+        for item in archive:
+            name = item.name.rstrip('/')
+            parts = name.split('/')
+            if '\\' in name or parts[0] != 'package' or any(p in ('', '.', '..') for p in parts):
+                raise ValueError('Unsafe npm archive entry')
+            if item.isdir():
+                continue
+            if not item.isfile() or len(parts) < 2 or name[8:] in files:
+                raise ValueError('Duplicate or non-regular npm archive entry')
+            files[name[8:]] = archive.extractfile(item).read()
+    return files
+
+
+def verify_react_native(path, version, source):
+    """Compare the installed format with canonical inputs, including shared/iOS sources."""
+    prefix = 'adapters/react-native/'
+    package = json.loads(source[prefix + 'package.json'])
+    meta = json.loads(source['plugin.json'])
+    if package['name'] != meta['adapters']['reactNative']['package'] or package['version'] != version or meta['version'] != version:
+        raise ValueError('RN package identity/version mismatch')
+    if package.get('private') or package.get('publishConfig', {}).get('access') != 'public':
+        raise ValueError('RN package is not publishable')
+    inputs = {name[len(prefix):]: content for name, content in source.items() if name.startswith(prefix)}
+    for origin, destination in json.loads(source[prefix + 'inputs.json']).items():
+        if any(PurePosixPath(p).is_absolute() or '..' in PurePosixPath(p).parts for p in (origin, destination)):
+            raise ValueError('Unsafe RN input mapping')
+        matches = {name: content for name, content in source.items() if name == origin or name.startswith(origin + '/')}
+        if not matches:
+            raise ValueError('Missing RN canonical input: ' + origin)
+        for name, content in matches.items():
+            inputs[destination + name[len(origin):]] = content
+    allowed = package['files'] + ['package.json']
+    expected = {name: content for name, content in inputs.items()
+                if any(name == scope or name.startswith(scope + '/') for scope in allowed)}
+    files = read_npm(path)
+    if set(files) != set(expected):
+        raise ValueError('RN package file inventory differs: ' + str(sorted(set(files) ^ set(expected))))
+    for name, content in expected.items():
+        if files[name] != content:
+            raise ValueError('RN packaged input differs from release source: ' + name)
+    return files
+
+
 def verify_packages(artifacts, version):
     manifest=json.loads(artifacts['native-build-manifest'].read_text())
     if manifest['version'] != version or manifest['kind'] != 'avvessa-native-release': raise ValueError('Native manifest mismatch')
     for role,digest in manifest['artifacts'].items():
         if sha(artifacts[role]) != digest: raise ValueError('Native artifact mismatch: '+role)
+    if 'react-native-package' in artifacts:
+        with read_zip(artifacts['native-ios-spm-source']) as source:
+            verify_react_native(artifacts['react-native-package'], version,
+                {name: source.read(name) for name in source.namelist() if not name.endswith('/')})
     with read_zip(artifacts['native-android-maven-repository']) as maven:
         expected={f'io/github/sandroxy/{module}/{version}/{module}-{version}{suffix}' for module in MODULES
                   for suffix in ('.aar','.pom','.module','-sources.jar','-javadoc.jar')}

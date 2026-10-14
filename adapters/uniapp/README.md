@@ -10,7 +10,7 @@
 
 插件市场提供的 `Sandrox-Avvessa` UTS 包同时适用于经典 uni-app 和 uni-app x。经典原生插件（legacy）另提供 ZIP；原生 Android／iOS 接入见[项目主页](https://github.com/sandroxy/avvessa)。三种 UNI 方式共用 Avvessa 原生核心及极光官方 JPush/JCore SDK。
 
-通知发送服务、登录与账号绑定、消息内容和点击后的业务页面由接入应用负责。Avvessa 不包含通话信令、PushKit／CallKit 或通话界面。
+通知发送服务、登录与账号绑定、消息内容和点击后的业务页面由接入应用负责。
 
 ## 支持范围
 

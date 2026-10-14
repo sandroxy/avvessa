@@ -34,14 +34,13 @@ def prepare(args):
     commit=capture('git','rev-parse','HEAD');dirty=bool(capture('git','status','--porcelain'))
     if dirty and not args.rehearsal: raise ValueError('Formal preparation requires committed, clean source')
     files=source_files();digest=source_digest(files)
-    work=ROOT/'.build/release'; out=ROOT/('dist/rehearsal' if args.rehearsal else 'dist/release')
+    work=ROOT/'.build/release'; out=ROOT/('dist/rehearsal' if args.rehearsal else 'dist/release')/version
     for directory in (work,out):
         if directory.is_symlink() or ROOT not in directory.resolve().parents: raise ValueError('Release output escapes repository')
         directory.mkdir(parents=True,exist_ok=True)
-    current=ROOT/'dist/candidate.json'
-    if current.exists() and not args.rehearsal:
-        prior=json.loads(current.read_text())
-        if prior['state']=='candidate': raise ValueError('A frozen candidate already exists. Inspect and archive it explicitly before another preparation; never replace accepted files')
+    current=out/'candidate.json'
+    if current.exists():
+        raise ValueError('A frozen candidate already exists. Inspect and preserve it explicitly before another preparation; never replace accepted files')
     run('python3',ROOT/'scripts/check-metadata.py')
     policy=json.loads((ROOT/'release-policy.json').read_text())
     repository=work/'maven'
@@ -128,6 +127,9 @@ def prepare(args):
         '--ios-products',device,'--vendor-kit',kit_archive,'--output',uni)
     for mode in ('uts','legacy'):
         artifacts[f'uniapp-{mode}-package']=uni/f'avvessa-uniapp-{"legacy-" if mode=="legacy" else ""}{version}.zip'
+    npm = Path(capture('python3', ROOT/'scripts/prepare-react-native.py', '--output', work/'react-native', '--pack'))
+    artifacts['react-native-package'] = out/npm.name
+    shutil.copy2(npm, artifacts['react-native-package'])
     if source_digest(source_files())!=digest or capture('git','rev-parse','HEAD')!=commit:
         raise ValueError('Source changed during preparation; outputs are not qualified')
     manifest={'schemaVersion':1,'kind':'avvessa-native-release','version':version,
@@ -143,7 +145,7 @@ def prepare(args):
         checksum=Path(str(path)+'.sha256');checksum.write_text(sha(path)+'  '+path.name+'\n');artifacts['checksum-'+role]=checksum
     command=['ruby',ROOT/'scripts/snapshot-release-candidate.rb','--plugin','avvessa','--policy',ROOT/'release-policy.json',
         '--version',version,'--repository',meta['repository'],'--commit',commit,'--dirty',str(dirty).lower(),
-        '--root',ROOT,'--state','rehearsal' if args.rehearsal else 'candidate',
+        '--root',ROOT,'--output-dir',out,'--state','rehearsal' if args.rehearsal else 'candidate',
         '--qualification','androidMavenSigned='+str(bool(args.signing_fingerprint)).lower(),
         '--qualification','artifactProvenanceVerified=true']
     for kind,option in [('automatedTargets','--automated-target'),('manualTargets','--manual-target')]:

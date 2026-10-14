@@ -1,7 +1,6 @@
 {
   "name": "@sandrox/avvessa",
-  "version": "1.0.0",
-  "private": true,
+  "version": "1.1.0",
   "description": "Jiguang push for React Native on Android and iOS",
   "main": "index.js",
   "types": "index.d.ts",
@@ -29,7 +28,8 @@
     "AvvessaReactNative.podspec",
     "avvessa-native.json",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "peerDependencies": {
     "react": "*",
@@ -56,5 +56,9 @@
         }
       }
     }
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

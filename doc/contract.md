@@ -47,7 +47,7 @@ Removing an observer only removes that observer. It does not stop the process-wi
 
 iOS also includes `transportId` when a notification request ID is available and `action` for responses. Action metadata has `identifier` and, for a text response, `userText`; it does not overwrite payload keys.
 
-Normal event types are `notificationReceived`, `notificationOpened`, `notificationDismissed` and `customMessage`. A suppressed foreground notification remains `notificationReceived` with `presentation.suppressed: true`; it is not discarded or converted into a custom message. Android can additionally report the SDK's raw `voipMessage` transport event. That event does not provide incoming-call handling, UI, CallKit or PushKit.
+Normal event types are `notificationReceived`, `notificationOpened`, `notificationDismissed` and `customMessage`. A suppressed foreground notification remains `notificationReceived` with `presentation.suppressed: true`; it is not discarded or converted into a custom message. Additional SDK event types are defined in the public types; their original payload is retained in `raw`.
 
 On Android, `raw` snapshots the pinned SDK message object's public JSON-compatible fields; it is not the original HTTP request or an Android Context/Parcelable serialization. The extras string is retained verbatim. On iOS, `raw` is the SDK's userInfo dictionary. Malformed extras produce `invalid_payload` without removing the original extras from `raw`. Payloads that cannot be encoded as JSON are rejected explicitly.
 

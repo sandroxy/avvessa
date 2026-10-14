@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Materialize a source-only RN package. Does not build, install, sign, or publish."""
+"""Materialize the complete RN package and optionally npm-pack it. Never publishes."""
 import argparse
 import json
 import shutil
@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def prepare(output):
+def prepare(output, pack=False):
     if output.is_symlink() or any(parent.is_symlink() for parent in output.absolute().parents):
         raise ValueError('Output must not traverse symbolic links')
     output = output.resolve()
@@ -50,10 +50,19 @@ def prepare(output):
     package['version'] = json.loads((ROOT / 'plugin.json').read_text())['version']
     (output / 'package.json').write_text(json.dumps(package, indent=2) + '\n')
     marker.write_text('avvessa-react-native-source\n')
-    print(output)
+    if pack:
+        result = subprocess.check_output(['npm', 'pack', '--ignore-scripts', '--json'], cwd=output, text=True)
+        packed = json.loads(result)
+        if len(packed) != 1:
+            raise ValueError('npm pack must produce exactly one tarball')
+        print(output / packed[0]['filename'])
+    else:
+        print(output)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    prepare(parser.parse_args().output)
+    parser.add_argument('--pack', action='store_true', help='Create the local npm tarball without running package scripts')
+    args = parser.parse_args()
+    prepare(args.output, args.pack)

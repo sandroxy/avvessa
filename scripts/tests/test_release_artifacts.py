@@ -1,19 +1,52 @@
 import hashlib
 import importlib.util
 import json
+import io
 from pathlib import Path
 import sys
 import tempfile
+import tarfile
 import unittest
 import zipfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from release_artifacts import read_zip, zip_tree
+from release_artifacts import read_zip, zip_tree, read_npm, verify_react_native
 spec=importlib.util.spec_from_file_location('vendors',Path(__file__).resolve().parents[1]/'configure-uniapp-vendors.py')
 vendors=importlib.util.module_from_spec(spec);spec.loader.exec_module(vendors)
 
 
 class DistributionTests(unittest.TestCase):
+    def test_npm_requires_complete_canonical_inputs_and_rejects_modified_or_private_files(self):
+        package = {'name': '@sandrox/avvessa', 'version': '1.1.0', 'publishConfig': {'access': 'public'},
+                   'files': ['index.js', 'shared', 'avvessa-native.json']}
+        metadata = {'version': '1.1.0', 'adapters': {'reactNative': {'package': '@sandrox/avvessa'}}}
+        source = {'plugin.json': json.dumps(metadata).encode(),
+                  'adapters/react-native/package.json': json.dumps(package).encode(),
+                  'adapters/react-native/index.js': b'public facade',
+                  'adapters/react-native/inputs.json': json.dumps({'core/bridge.js': 'shared/bridge.js', 'plugin.json': 'avvessa-native.json'}).encode(),
+                  'core/bridge.js': b'canonical bridge'}
+        contents = {'package.json': source['adapters/react-native/package.json'], 'index.js': b'public facade',
+                    'shared/bridge.js': b'canonical bridge', 'avvessa-native.json': source['plugin.json']}
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'package.tgz'
+            def pack(files):
+                with tarfile.open(path, 'w:gz') as archive:
+                    for name, data in files.items():
+                        item = tarfile.TarInfo('package/'+name);item.size=len(data)
+                        archive.addfile(item, io.BytesIO(data))
+            pack(contents)
+            self.assertEqual(verify_react_native(path, '1.1.0', source), contents)
+            for files in [contents | {'shared/bridge.js': b'changed'},
+                          {k:v for k,v in contents.items() if k != 'shared/bridge.js'},
+                          contents | {'agconnect-services.json': b'private'},
+                          contents | {'../escape': b'bad'}]:
+                pack(files)
+                with self.assertRaises(ValueError): verify_react_native(path, '1.1.0', source)
+            with tarfile.open(path, 'w:gz') as archive:
+                item=tarfile.TarInfo('package/linked');item.type=tarfile.SYMTYPE;item.linkname='/tmp/other'
+                archive.addfile(item)
+            with self.assertRaises(ValueError): read_npm(path)
+
     def test_duplicate_and_traversing_archive_entries_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:
             path=Path(temporary)/'bad.zip'

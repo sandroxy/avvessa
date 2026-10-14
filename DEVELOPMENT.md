@@ -56,7 +56,7 @@ iOS hooks capture APNs callbacks before page creation. Framework adapters opt in
 
 ### React Native
 
-The RN adapter is source development only; it is absent from the published release matrix. Its package remains private until native builds, consumer checks and device acceptance establish a release contract. The consumer targets React Native 0.81 and Expo SDK 54. Do not infer RN acceptance from native or UNI device results.
+The RN adapter provides legacy-bridge and TurboModule transports. The integration repository owns its isolated consumer and platform checks; native or UNI device results do not establish RN behavior. Host baselines are declared in `plugin.json`.
 
 Host setup, Expo options and API examples belong to the [RN integration guide](adapters/react-native/README.md).
 
@@ -66,7 +66,7 @@ Host setup, Expo options and API examples belong to the [RN integration guide](a
 python3 scripts/prepare-react-native.py --output .build/react-native/package
 ```
 
-The integration repository's isolated source preparer reads the same input manifest. Its Android target builds local core/vendor AARs; its iOS target copies core sources into the local Pod. The public stable host, npm artifact registry and release receipt remain separate.
+The integration repository's isolated source preparer reads the same input manifest. Its Android target builds local core/vendor AARs; its iOS target copies core sources into the local Pod. For distribution, pass `--pack` to the same command. It materializes all canonical inputs and runs `npm pack --ignore-scripts`; the adapter directory alone is not a complete package. Candidate consumers install that frozen tarball and resolve Android cores from the candidate Maven repository.
 
 RN commands resolve one JSON envelope. Subscription observations use a separate native event channel; the JS transport buffers replay until acknowledgement, releases its listener after the final unsubscribe and detaches owned observers on hot replacement. React runtime invalidation closes native bridge ownership without stopping push or acknowledging events. The iOS session receives launch options and activation callbacks from its host instead of referencing a DCloud lifecycle singleton.
 

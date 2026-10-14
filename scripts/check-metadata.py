@@ -19,7 +19,7 @@ for name in ("jpush", "jcore"):
     if pins[name + "-sdk"] != ios[name]:
         sys.exit(f"{name}: resolved package version differs")
 for filename in ("README.md", "README-EN.md", "DEVELOPMENT.md", "RELEASING.md", "CHANGELOG.md", "doc/contract.md",
-                 "native/android/README.md", "native/ios/README.md", "THIRD_PARTY_NOTICES.md", "adapters/uniapp/README.md"):
+                 "native/android/README.md", "native/ios/README.md", "THIRD_PARTY_NOTICES.md", "adapters/uniapp/README.md", "adapters/react-native/README.md"):
     text = (root / filename).read_text()
     for target in re.findall(r"\]\(([^)]+)\)", text):
         if "://" in target or target.startswith("#"):
@@ -39,7 +39,12 @@ if result.returncode != 0:
 tracked = subprocess.check_output(["git", "ls-files", "doc/dev"], cwd=root, text=True)
 if tracked:
     sys.exit("Development notes must not be tracked")
-print("Native/UNI dependency metadata, public links and development-note exclusion are consistent.")
+rn = json.loads((root / 'adapters/react-native/package.json').read_text())
+if rn['name'] != metadata['adapters']['reactNative']['package'] or rn['version'] != metadata['version'] or rn.get('private'):
+    sys.exit('RN package identity, version or publication status differs from plugin.json')
+if rn['peerDependencies']['react-native'] != '>=' + metadata['adapters']['reactNative']['minimumReactNative']:
+    sys.exit('RN peer requirement differs from plugin.json')
+print("Native/UNI/RN dependency metadata, public links and development-note exclusion are consistent.")
 
 policy = json.loads((root / 'release-policy.json').read_text())
 if policy['plugin'] != metadata['id'] or policy['sourceRepository'] != metadata['repository']:

@@ -1,7 +1,7 @@
 {
   "id": "Sandrox-Avvessa",
   "displayName": "Avvessa 极光推送",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "基于官方极光原生 SDK 的通用推送，支持在线通知、厂商通道、通知配置与持久化事件。",
   "keywords": [
     "JPush",

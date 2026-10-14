@@ -4,7 +4,7 @@
 
 Avvessa 是基于极光官方原生 SDK 的通用推送组件，提供 Android 和 iOS 原生接口。应用通过 AppKey 初始化，按需配置 APNs 或 Android 厂商通道，接收通知、自定义消息和点击事件。
 
-当前发布版本支持 Android、iOS 原生，以及 UNI legacy、经典 UTS、uni-app x；RN、Flutter 包尚未发布。登录、账号绑定、页面路由和服务端发送由应用负责。来电信令、PushKit／CallKit、接听挂断和通话界面不在 Avvessa 的范围内。
+支持 Android、iOS 原生，UNI legacy、经典 UTS、uni-app x，以及 React Native 双端接入。登录、账号绑定、页面路由和服务端发送由应用负责。
 
 ## 能力
 
@@ -26,6 +26,7 @@ Avvessa 是基于极光官方原生 SDK 的通用推送组件，提供 Android �
 | --- | --- |
 | Android | [Java / Kotlin](native/android/README.md)：Maven 依赖、通知配置、可选厂商通道 |
 | iOS | [Swift / Objective-C](native/ios/README.md)：SPM、XCFramework、APNs 与生命周期 |
+| React Native / Expo | [RN 接入](adapters/react-native/README.md)：npm 安装、自动链接、原生配置与事件消费 |
 | UNI legacy / 经典 UTS / uni-app x | [UNI 接入](adapters/uniapp/README.md)：安装、消费配置与 JavaScript / UTS API |
 
 AppKey 不替代平台配置：iOS 需要匹配 Bundle ID 的 APNs 配置和签名能力；Android 厂商通道需要对应厂商应用参数。服务端 Master Secret 不进入客户端。
