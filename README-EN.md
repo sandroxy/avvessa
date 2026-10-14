@@ -26,7 +26,7 @@ Persistent connections, APNs, and vendor channels have different delivery condit
 | --- | --- |
 | Android | [Java / Kotlin](native/android/README.md): Maven dependencies, notification settings, and optional vendor channels |
 | iOS | [Swift / Objective-C](native/ios/README.md): SPM, XCFramework, APNs, and lifecycle forwarding |
-| React Native / Expo | [RN integration (Chinese)](adapters/react-native/README.md): npm installation, autolinking, native configuration, and event consumption |
+| React Native / Expo | [RN integration](adapters/react-native/README.md): npm installation, autolinking, native configuration, and event consumption |
 | UNI legacy / classic UTS / uni-app x | [UNI integration](adapters/uniapp/README.md): installation, consumer configuration, and JavaScript / UTS APIs |
 
 An AppKey does not replace platform setup. iOS requires APNs configuration and signing capabilities matching the Bundle ID. Android vendor channels require the corresponding vendor application settings. Never embed the server-side Master Secret in a client.

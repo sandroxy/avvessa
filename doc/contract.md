@@ -1,6 +1,6 @@
 # Push behavior and event contract
 
-This contract defines shared behavior for the native APIs and UNI adapters. Platform setup and API syntax belong to the [Android](../native/android/README.md), [iOS](../native/ios/README.md) and [UNI](../adapters/uniapp/README.md) guides.
+This contract defines shared behavior for the native APIs, React Native and UNI adapters. Platform setup and API syntax belong to the [Android](../native/android/README.md), [iOS](../native/ios/README.md), [React Native](../adapters/react-native/README.md) and [UNI](../adapters/uniapp/README.md) guides.
 
 ## Initialization and state
 
@@ -82,7 +82,7 @@ Revoking consent clears pending events and RegistrationID and cancels pending SD
 
 ### Foreground policy
 
-`presentationPolicy` is an immutable initialization option shared by both native cores and all UNI entry points:
+`presentationPolicy` is an immutable initialization option shared by both native cores and all adapters:
 
 ```json
 {

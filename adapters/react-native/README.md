@@ -1,24 +1,30 @@
-# Avvessa React Native 接入
+# Avvessa for React Native
 
-通过 npm 包 `@sandrox/avvessa` 为 React Native 接入极光推送，包含旧桥与 TurboModule 入口。支持 React Native 0.81 起的宿主，Expo 基线为 SDK 54；更新的 RN／Expo 版本仍须按应用依赖验证兼容性。最低系统取 RN、Avvessa 及所选厂商 SDK 的共同要求，当前 RN 基线为 Android API 24、iOS 15.1。Expo 需要包含原生插件的开发构建，Expo Go 不包含 Avvessa。
+Add Jiguang push notifications to Android and iOS applications with `@sandrox/avvessa`. The package supports React Native's legacy bridge and TurboModules, with optional Expo integration.
 
-提供普通通知、自定义消息、点击事件、事件持久化和展示控制。业务账号、路由、隐私同意时机与服务端发送由应用负责。
+Receive notifications, custom messages and notification interactions, replay stored events, and control foreground presentation. The application owns authentication, account binding, navigation, consent decisions and server-side sending.
 
-## 安装
+## Requirements
+
+- React Native 0.81 or later. Expo SDK 54 is the integration baseline; check newer RN and Expo combinations against your application's dependencies.
+- The RN integration baseline requires Android API 24 and iOS 15.1. Use the highest minimum required by React Native, Avvessa and your selected vendor SDKs.
+- Expo requires a development build containing Avvessa's native modules. Expo Go does not include them.
+
+## Install
 
 ```sh
 npm install @sandrox/avvessa
 ```
 
-安装后由 RN 自动链接 Android 模块与 `AvvessaReactNative` Pod。普通 RN 项目完成下方原生配置后运行 `npx pod-install` 并重新构建应用。Expo 项目先填写下一节配置，再运行 `npx expo prebuild` 和 `npx expo run:android`／`npx expo run:ios`。
+React Native autolinks the Android module and the `AvvessaReactNative` Pod. For a project without Expo, complete the native setup below, run `npx pod-install`, and rebuild the application. For Expo, configure the plugin in the next section, then run `npx expo prebuild` and `npx expo run:android` or `npx expo run:ios`.
 
-Android 使用 Avvessa Maven 核心，厂商模块按需选择。iOS 使用同一核心的源码和隐私资源，由 CocoaPods 链接元数据锁定的官方 JPush／JCore。不要同时链接另一份 Avvessa、`jpush-react-native` 或另一套手动初始化的 JPush。
+Android uses Avvessa's Maven core with optional vendor modules. iOS includes the core sources and privacy resources; CocoaPods resolves the official JPush and JCore versions pinned by the package metadata. Do not also link a separate Avvessa core, `jpush-react-native`, or another integration that initializes JPush independently.
 
-普通 RN 不依赖 ExpoModulesCore。Expo 项目额外链接 `AvvessaExpo`，自动转发应用启动及 APNs 回调。若应用用 `expo-notifications` 处理其他通知，可保留它；Avvessa 消息只应由一个业务消费者处理，避免重复执行或再创建本地通知。
+A React Native project without Expo does not depend on ExpoModulesCore. Expo projects additionally link `AvvessaExpo`, which forwards application launch and APNs callbacks. You can keep `expo-notifications` for other notifications, but handle each Avvessa message through one application consumer to avoid duplicate actions or local notifications.
 
-## Expo 配置
+## Configure Expo
 
-在 `app.config.js` 的 `plugins` 中加入：
+Add this entry to the `plugins` array in `app.config.js`:
 
 ```js
 ['@sandrox/avvessa', {
@@ -30,57 +36,59 @@ Android 使用 Avvessa Maven 核心，厂商模块按需选择。iOS 使用同�
 }]
 ```
 
-`apnsEnvironment` 必须匹配签名中的 APNs entitlement：开发签名为 `development`，分发签名为 `production`。插件增加 `aps-environment` 和后台 `remote-notification`；不决定用户同意时机，也不自动申请通知权限。
+`ios.apnsEnvironment` must match the application's signed APNs entitlement: `development` for development signing or `production` for distribution signing. Use the same value when initializing Avvessa. The plugin adds `aps-environment` and the `remote-notification` background mode; the application still controls consent and notification permission requests.
 
-如需小图标，在 `android.notificationIcon` 填入本项目已有资源路径，例如 `./assets/push-small.xml`。提供透明背景的单色 vector XML 或 PNG 后，生成资源名为 `drawable/avvessa_notification_custom`；初始化时在 `android.smallIcon` 中使用该名字，通过 `android.color` 指定颜色。系统或厂商通知样式仍可能展示应用图标。
+For a notification small icon, set `android.notificationIcon` to an existing asset such as `./assets/push-small.xml`. Supply a monochrome Android vector XML or PNG with a transparent background. The generated resource name is `drawable/avvessa_notification_custom`; pass that name as `android.smallIcon` at initialization and set `android.color` for its tint. System or vendor notification layouts may also display the application icon.
 
-`android.vendors` 只选择需要的模块，`android.vendorProperties` 只填写对应字符串参数：
+Select the modules you need in `android.vendors`. Set their string parameters in `android.vendorProperties`; Huawei and FCM instead require service file options directly under `android`:
 
-| 模块 | 参数 |
+| Module | Configuration |
 | --- | --- |
-| `xiaomi` | `XIAOMI_APPID`、`XIAOMI_APPKEY` |
-| `huawei` | `android.agconnectServicesFile` 指向匹配包名的 JSON |
+| `xiaomi` | `XIAOMI_APPID`, `XIAOMI_APPKEY` |
+| `huawei` | `android.agconnectServicesFile`: path to the service JSON matching the application package name |
 | `honor` | `HONOR_APPID` |
-| `oppo` | `OPPO_APPID`、`OPPO_APPKEY`、`OPPO_APPSECRET` |
-| `vivo` | `VIVO_APPID`、`VIVO_APPKEY` |
-| `meizu` | `MEIZU_APPID`、`MEIZU_APPKEY` |
-| `fcm` | `android.googleServicesFile` 指向匹配包名的 JSON |
+| `oppo` | `OPPO_APPID`, `OPPO_APPKEY`, `OPPO_APPSECRET` |
+| `vivo` | `VIVO_APPID`, `VIVO_APPKEY` |
+| `meizu` | `MEIZU_APPID`, `MEIZU_APPKEY` |
+| `fcm` | `android.googleServicesFile`: path to the service JSON matching the application package name |
 
-文件路径相对于应用根目录或使用绝对路径。未知字段、缺少参数、重复模块及服务文件包名不匹配会报错。未选择的厂商不加入原生依赖。应用参数从本地或 CI 配置读取，服务端 Master Secret 不进入客户端。
+File paths are relative to the application root or absolute. Unknown fields, missing parameters, duplicate modules and mismatched service files cause configuration errors. Unselected vendors do not add native dependencies. Read application settings from local or CI configuration; never include the server-side Master Secret in the client.
 
-配置插件处理标准 Groovy Gradle 工程；Kotlin DSL 需手动配置。修改原生配置后重新 prebuild 和构建，JS 刷新不会改变 Manifest、资源或 entitlement。
+The config plugin handles standard Groovy Gradle projects. Configure Kotlin DSL projects manually. After changing native configuration, run prebuild and rebuild the application; reloading JavaScript does not update manifests, resources or entitlements.
 
-## 普通 RN 原生配置
+## Native setup without Expo
 
-Android 自动链接后无需修改 Activity 的通知点击入口。基础权限、接收器及通知入口来自原生核心 Manifest。厂商模块在 `gradle.properties` 中通过 `avvessaVendorModules=xiaomi,huawei` 选择，再按 [Android 厂商配置](https://github.com/sandroxy/avvessa/blob/main/native/android/README.md#optional-manufacturer-transports)填写占位符、仓库和服务文件。小图标放在宿主 `res/drawable`，初始化时填写资源名。推送本身不需要定位、电话状态或存储读取权限；核心移除这些 SDK 可选权限，宿主仍应检查最终合并清单。
+On Android, autolinking requires no changes to the Activity's notification-click entry point. The native core manifest supplies the base permissions, receivers and notification entry points. Select vendor modules in `gradle.properties`, for example `avvessaVendorModules=xiaomi,huawei`, then follow the [Android vendor setup](https://github.com/sandroxy/avvessa/blob/main/native/android/README.md#optional-manufacturer-transports) for placeholders, repositories and service files. Place small icons in the application's `res/drawable` and pass the resource name at initialization. Push does not require location, phone-state or storage-read permissions; the core removes these optional SDK permissions. Check the application's final merged manifest.
 
-iOS AppDelegate 导入 `AvvessaReactNative`，在已有回调中加入下列调用，不要重复定义同名回调：
+On iOS, import `AvvessaReactNative` in AppDelegate and add these calls to the existing callbacks. Do not define a second implementation of the same callback:
 
-| 宿主回调 | Swift 转发调用 |
+| Application callback | Swift forwarding call |
 | --- | --- |
-| 应用启动，启动 React 之前 | `AVReactNativeLifecycle.shared.launch(launchOptions)` |
-| 应用回到前台 | `AVReactNativeLifecycle.shared.activate()` |
-| APNs 注册成功 | `AVReactNativeLifecycle.shared.registerDeviceToken(deviceToken)` |
-| APNs 注册失败 | `AVReactNativeLifecycle.shared.registrationFailed(error as NSError)` |
-| 后台远程通知 | `AVReactNativeLifecycle.shared.receive(userInfo)` |
+| Application launch, before starting React | `AVReactNativeLifecycle.shared.launch(launchOptions)` |
+| Application becomes active | `AVReactNativeLifecycle.shared.activate()` |
+| APNs registration succeeds | `AVReactNativeLifecycle.shared.registerDeviceToken(deviceToken)` |
+| APNs registration fails | `AVReactNativeLifecycle.shared.registrationFailed(error as NSError)` |
+| Background remote notification | `AVReactNativeLifecycle.shared.receive(userInfo)` |
 
-后台回调的完成函数由宿主调用一次；`receive` 返回该消息是否属于 Avvessa。如有其他服务参与处理，由宿主汇总结果。启用 Push Notifications、Background Modes → Remote notifications，并配置相应签名。
+The application must call the background completion handler exactly once. `receive` returns whether the payload belongs to Avvessa; aggregate results when other services also handle notifications. Enable Push Notifications and Background Modes → Remote notifications, with matching signing capabilities.
 
-启动入口安装通知代理协调器，保留其他模块后续对通知代理的赋值。Avvessa 通知由核心裁决前台展示，其他消息交给原有代理；被观察的代理需要宿主持有。该入口不授权或初始化 JPush。Expo 使用自动转发时不要再手动重复转发。
+The launch call installs a notification delegate coordinator that preserves later delegate assignments by other modules. Avvessa decides foreground presentation for its notifications and forwards other messages to the existing delegate. Keep a strong reference to any delegate being observed. These lifecycle calls do not grant consent or initialize JPush. With Expo's automatic forwarding, do not forward the same callbacks manually.
 
-## 初始化与事件消费
+## Initialize and consume events
 
-完整方法与参数见 [TypeScript 声明](https://github.com/sandroxy/avvessa/blob/main/adapters/uniapp/js_sdk/index.d.ts)，语义以 [公共契约](https://github.com/sandroxy/avvessa/blob/main/doc/contract.md)为准。RN 和 UNI 使用同一套 JSON 命令与错误码。
+The [TypeScript declarations](https://github.com/sandroxy/avvessa/blob/main/adapters/uniapp/js_sdk/index.d.ts) define the full API; the [shared contract](https://github.com/sandroxy/avvessa/blob/main/doc/contract.md) defines its behavior. React Native and UNI use the same JSON commands and error codes.
+
+Run this sequence in an async startup function using application-supplied `appConfiguration`. Consent, system notification permission and login are separate decisions:
 
 ```js
 import * as push from '@sandrox/avvessa';
 
-// appConfiguration 由应用提供；同意时机与系统权限、登录分别处理。
+// Call this only when the application's consent decision permits push.
 await push.setConsentGranted(true);
-const subscription = await push.subscribe(message => {
+const subscriptionId = await push.subscribe(message => {
   if (message.kind === 'state') console.log(message.state.registrationId);
   else if (message.kind === 'error') console.error(message.error);
-  else console.log(message.event); // 业务处理成功后再 acknowledge(event.id)。
+  else console.log(message.event); // Acknowledge event.id after successful handling.
 }, { replayPending: true });
 
 await push.initialize({
@@ -89,16 +97,16 @@ await push.initialize({
   ios: { apnsEnvironment: appConfiguration.apnsEnvironment },
   android: {
     notificationChannelId: 'messages',
-    notificationChannelName: '消息',
+    notificationChannelName: 'Messages',
     presentInForeground: true,
   },
 });
 await push.requestNotificationPermission();
 ```
 
-需要自定义 Android 渠道声音或振动时，在初始化前调用 `createNotificationChannel`；已创建渠道受系统设置管理。Android 权限请求可能在用户选择前返回，`granted: null` 时通过状态事件或回前台后的 `refreshState` 确认结果。iOS 初始化不能替代 APNs 转发与签名配置。
+Keep the subscription ID and call `unsubscribe(subscriptionId)` when that observer is no longer needed. To customize Android channel sound or vibration, call `createNotificationChannel` before initialization; existing channels remain subject to system settings. On Android, the permission request can resolve before the user's decision. If `granted` is `null`, observe state updates or call `refreshState` after returning to the foreground. iOS initialization still requires APNs forwarding and signing configuration.
 
-React 卸载可能早于订阅 Promise 完成，清理时要覆盖这段竞争：
+For a subscription owned by a React component, import `useEffect` from `react` and use the following effect inside the component instead of the subscription above. It handles unmounting before the subscription Promise resolves. Supply `handleObservation` and `reportError` from your application:
 
 ```js
 useEffect(() => {
@@ -117,16 +125,16 @@ useEffect(() => {
 }, [handleObservation, reportError]);
 ```
 
-`handleObservation` 和 `reportError` 由宿主提供。取消订阅只释放观察者，不停止 SDK 或删除待消费事件。通知点击可早于 React 启动，之后通过重放恢复；`event.id` 保持不变，`replayed` 标示重放。业务成功后显式 `acknowledge`，并按事件 ID 保证业务副作用幂等。
+Unsubscribing releases the observer without stopping the SDK or deleting pending events. Notification interactions can arrive before React starts and be replayed later with the same `event.id` and `replayed: true`. Call `acknowledge(event.id)` only after successful handling, and use the event ID to make application side effects idempotent.
 
-## 展示与生命周期
+## Presentation and lifecycle
 
-初始化的 `presentationPolicy` 声明静态规则和活动上下文字段映射；页面通过 `setActiveNotificationContext`／`clearActiveNotificationContext` 更新上下文。账号、路由及字段含义由宿主定义；前台横幅被抑制时接收事件仍保留。离开相应页面应清除上下文。
+Set `presentationPolicy` at initialization to define static rules and active-context field mappings. Screens update the context with `setActiveNotificationContext` and `clearActiveNotificationContext`; clear it when leaving the relevant screen. The application defines accounts, routes and field meanings. Suppressing a foreground banner preserves the receipt event.
 
-`notificationLifecycle` 可选控制初始化、回前台、点击通知时的角标或通知清理，默认关闭。运行时的 `clearNotifications`、`clearPendingEvents`、`acknowledge` 分别操作已展示通知、全部待消费事件及单条事件消费状态。
+The optional `notificationLifecycle` settings control badge cleanup at initialization, on return to the foreground and on notification open, plus delivered-notification cleanup at initialization and on return to the foreground. All are disabled by default. At runtime, `clearNotifications` removes delivered notifications, `clearPendingEvents` clears the pending event queue, and `acknowledge` marks one event as consumed.
 
-`stopPush`／`resumePush` 控制 SDK 推送，`unsubscribe` 只控制观察者。撤回同意使用 `setConsentGranted(false)`；重新同意后显式初始化或恢复。别名、标签及后端设备绑定由宿主按业务管理。SDK 原始消息类型按公共契约保留。
+Use `stopPush` and `resumePush` to control SDK push delivery; `unsubscribe` only controls an observer. Withdraw consent with `setConsentGranted(false)`. After granting consent again, explicitly initialize or resume the client. The application manages aliases, tags and server-side device binding. Original SDK message types are retained as described in the shared contract.
 
-## iOS 通知动作
+## iOS notification actions
 
-使用 `setNotificationCategories` 注册动作类别，再在服务端 iOS 通知的 `category` 填入相同标识；不要把它放进业务附加字段。按钮点击产生 `notificationOpened`，`event.action.identifier` 是所注册的动作 ID；文字回复还包含 `event.action.userText`。插件交付动作与文字，实际业务回复由应用处理。类别、动作选项及完整字段见公共契约的 [iOS notifications](https://github.com/sandroxy/avvessa/blob/main/doc/contract.md#notifications-and-platform-limits)。
+Register action categories with `setNotificationCategories`, then use the same identifier in the server's iOS notification `category` field, not in custom extras. A button interaction produces `notificationOpened` with the registered action ID in `event.action.identifier`. Text responses also include `event.action.userText`. Avvessa delivers the action and text; the application sends any business reply. See `NotificationCategory` in the [TypeScript declarations](https://github.com/sandroxy/avvessa/blob/main/adapters/uniapp/js_sdk/index.d.ts) for category and action options, and the [notification contract](https://github.com/sandroxy/avvessa/blob/main/doc/contract.md#notifications-and-platform-limits) for platform behavior and limits.
