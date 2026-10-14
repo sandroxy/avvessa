@@ -1,11 +1,11 @@
-#import "AVUniNotificationDelegate.h"
+#import "AVNotificationDelegateInstallation.h"
 #import <objc/runtime.h>
 
 static __weak UNUserNotificationCenter *AVManagedCenter;
 static __weak AVNotificationDelegate *AVManagedDelegate;
 static void (*AVSetDelegate)(id, SEL, id);
 
-void AVUniInstallNotificationDelegate(UNUserNotificationCenter *center, AVNotificationDelegate *coordinator) {
+void AVInstallNotificationDelegate(UNUserNotificationCenter *center, AVNotificationDelegate *coordinator) {
     NSCAssert(NSThread.isMainThread, @"Notification delegate installation requires the main thread");
     AVManagedCenter = center; AVManagedDelegate = coordinator;
     static dispatch_once_t once;

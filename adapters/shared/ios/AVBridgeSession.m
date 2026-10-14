@@ -1,5 +1,9 @@
 #import "include/AvvessaBridge.h"
+#if __has_include(<Avvessa/Avvessa.h>)
 #import <Avvessa/Avvessa.h>
+#else
+#import "Avvessa.h"
+#endif
 #import <CoreFoundation/CoreFoundation.h>
 #import <math.h>
 
@@ -78,8 +82,17 @@ static void Send(AVJSONCallback callback, id data, NSError *error) {
 @implementation AVBridgeSession {
     NSMutableDictionary<NSString *, AVBridgeObservation *> *_observations;
     BOOL _closed;
+    NSDictionary *(^_launchOptionsProvider)(void);
+    void (^_activation)(void);
 }
-- (instancetype)init { if ((self = [super init])) _observations = [NSMutableDictionary dictionary]; return self; }
+- (instancetype)init { return [self initWithLaunchOptionsProvider:nil activation:nil]; }
+- (instancetype)initWithLaunchOptionsProvider:(NSDictionary *(^)(void))provider activation:(void (^)(void))activation {
+    if ((self = [super init])) {
+        _observations = [NSMutableDictionary dictionary];
+        _launchOptionsProvider = [provider copy]; _activation = [activation copy];
+    }
+    return self;
+}
 - (void)invoke:(NSString *)method argumentsJSON:(NSString *)arguments completion:(AVJSONCallback)completion {
     void (^work)(void) = ^{
         if (self->_closed) { Send(completion,nil,BridgeError(@"bridge_closed",@"This bridge owner has been disposed")); return; }
@@ -133,8 +146,8 @@ static void Send(AVJSONCallback callback, id data, NSError *error) {
     if ([method isEqual:@"initialize"]) {
         AVPushConfiguration *config = [self configuration:args error:&error];
         if (!config) { Send(completion,nil,error); return; }
-        [AVUniLifecycle.shared activate];
-        [client initializeWithConfiguration:config launchOptions:AVUniLifecycle.shared.launchOptions error:&error];
+        if (_activation) _activation();
+        [client initializeWithConfiguration:config launchOptions:_launchOptionsProvider ? _launchOptionsProvider() : nil error:&error];
     } else if ([method isEqual:@"setConsentGranted"]) {
         Fields(args,@[@"granted"]); if (!args[@"granted"]) @throw Invalid(@"granted is required");
         [client setConsentGranted:BoolValue(args,@"granted",NO) error:&error];

@@ -3,7 +3,7 @@ import { invokeForJavaScript, setEventHandler } from '../bridge.uts'
 import { AVBridgeSession, AVUniLifecycle } from 'AvvessaBridge'
 import { UIApplication } from 'UIKit'
 import { Data, NSError } from 'Foundation'
-const session = new AVBridgeSession()
+const session: AVBridgeSession = AVUniLifecycle.shared.makeSession()
 const transport: AvvessaTransport = function(method: string, args: string, callback: AvvessaNativeCallback): void {
   session.invoke(method, argumentsJSON = args, completion = (json: string) => { callback(json) })
 }

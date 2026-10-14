@@ -11,6 +11,7 @@ Local tooling uses Python 3, Node.js and Bash; the CocoaPods specification check
 | `native/android` | Java core, Android callbacks, optional vendor modules and Maven metadata |
 | `native/ios` | Objective-C core, Swift-facing API, APNs callbacks and privacy resources |
 | `adapters/shared` | JSON command validation and native subscription ownership |
+| `adapters/react-native` | RN transport, TurboModule/legacy entry points and optional Expo integration |
 | `adapters/uniapp` | Legacy DCloud modules, JavaScript API and UNI integration guide |
 | `uni_modules/Sandrox-Avvessa` | Classic UTS transport and uni-app x consumer facade |
 | `scripts` | Local build, packaging and release tools |
@@ -51,7 +52,34 @@ The privacy resource combines declarations from the pinned SDKs because static-l
 
 The shared native bridge validates JSON commands and owns observer lifetimes. Legacy modules and UTS entry points forward to it. Classic JavaScript and the uni-app x UTS facade each use a single persistent event channel; DCloud must retain that callback. Adapters do not acknowledge events automatically.
 
-iOS hooks capture APNs callbacks before page creation. Only the UNI adapter intercepts delegate assignments on the managed notification center, adding observers to the native coordinator; other centers are unaffected. Public packages contain plugin code and SDK dependencies. Application-specific vendor resources belong in a separate consumer AAR, never in a redistributed plugin package.
+iOS hooks capture APNs callbacks before page creation. Framework adapters opt into shared delegate installation on the managed notification center, adding observers to the native coordinator; other centers are unaffected. Public packages contain plugin code and SDK dependencies. Application-specific vendor resources belong in a separate consumer AAR, never in a redistributed plugin package.
+
+### React Native
+
+The RN adapter is source development only; it is absent from the published release matrix. Its package remains private until native builds, consumer checks and device acceptance establish a release contract. The consumer targets React Native 0.81 and Expo SDK 54. Do not infer RN acceptance from native or UNI device results.
+
+Host setup, Expo options and API examples belong to the [RN integration guide](adapters/react-native/README.md).
+
+`adapters/react-native/inputs.json` defines the canonical package inputs. The JavaScript facade and declarations come from the existing UNI JavaScript contract, the command layer from `adapters/shared`, and the iOS core from `native/ios`. No copy of those implementations is maintained inside the adapter. To materialize a source package without building or installing:
+
+```sh
+python3 scripts/prepare-react-native.py --output .build/react-native/package
+```
+
+The integration repository's isolated source preparer reads the same input manifest. Its Android target builds local core/vendor AARs; its iOS target copies core sources into the local Pod. The public stable host, npm artifact registry and release receipt remain separate.
+
+RN commands resolve one JSON envelope. Subscription observations use a separate native event channel; the JS transport buffers replay until acknowledgement, releases its listener after the final unsubscribe and detaches owned observers on hot replacement. React runtime invalidation closes native bridge ownership without stopping push or acknowledging events. The iOS session receives launch options and activation callbacks from its host instead of referencing a DCloud lifecycle singleton.
+
+The optional Expo Pod uses [AppDelegate subscribers](https://docs.expo.dev/modules/appdelegate-subscribers/). Codegen follows the [RN 0.81 module configuration](https://reactnative.dev/docs/0.81/the-new-architecture/using-codegen). Ordinary RN hosts forward callbacks explicitly; the native cores contain neither framework dependency.
+
+Local transport and configuration regressions:
+
+```sh
+node --test adapters/react-native/tests/*.test.mjs adapters/react-native/tests/*.test.cjs
+node --test adapters/uniapp/tests/*.test.mjs
+```
+
+These isolated tests do not replace Android/iOS builds or device checks. Verify both module architectures, APNs forwarding, other notification delegates, React reload/unmount, pending replay, permissions and all consumer scenarios before publication. Changes to shared iOS session construction also require UNI bridge compilation and lifecycle regression.
 
 ## Android builds and tests
 

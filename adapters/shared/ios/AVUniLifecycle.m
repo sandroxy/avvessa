@@ -1,5 +1,5 @@
 #import "include/AvvessaBridge.h"
-#import "AVUniNotificationDelegate.h"
+#import "AVNotificationDelegateInstallation.h"
 
 @implementation AVUniLifecycle {
     NSDictionary *_launchOptions;
@@ -9,8 +9,12 @@
     dispatch_once(&once, ^{ instance = [self new]; }); return instance;
 }
 - (NSDictionary *)launchOptions { return _launchOptions; }
+- (AVBridgeSession *)makeSession {
+    return [[AVBridgeSession alloc] initWithLaunchOptionsProvider:^NSDictionary *{ return self.launchOptions; }
+        activation:^{ [self activate]; }];
+}
 - (void)install {
-    AVUniInstallNotificationDelegate(UNUserNotificationCenter.currentNotificationCenter, AVPushClient.sharedClient.notificationDelegate);
+    AVInstallNotificationDelegate(UNUserNotificationCenter.currentNotificationCenter, AVPushClient.sharedClient.notificationDelegate);
 }
 - (void)launch:(NSDictionary *)options { _launchOptions = [options copy]; [self install]; }
 - (void)activate { [self install]; [AVPushClient.sharedClient refreshNotificationSettings]; }

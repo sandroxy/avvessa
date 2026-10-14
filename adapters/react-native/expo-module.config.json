@@ -1,0 +1,11 @@
+{
+  "platforms": [
+    "apple"
+  ],
+  "apple": {
+    "podspecPath": "expo/AvvessaExpo.podspec",
+    "appDelegateSubscribers": [
+      "AvvessaAppDelegateSubscriber"
+    ]
+  }
+}

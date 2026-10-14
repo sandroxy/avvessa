@@ -33,7 +33,7 @@ function decode(json) {
 }
 let nextSubscription = 0;
 /** Transport emits one envelope for a command and a stream for subscribe. */
-export function createAvvessa(transport) {
+export function createAvvessa(transport, subscriptionNamespace = 'uni') {
   const subscriptions = new Set();
   function invoke(method, args = {}) {
     return new Promise((resolve, reject) => {
@@ -48,7 +48,7 @@ export function createAvvessa(transport) {
       if (!options || typeof options !== 'object' || Array.isArray(options) || Object.keys(options).some(key => key !== 'replayPending')) throw invalid('Only replayPending is supported');
       const replay = options.replayPending === undefined ? true : options.replayPending;
       if (typeof replay !== 'boolean') throw invalid('replayPending must be a boolean');
-      const id = `uni:${Date.now()}:${++nextSubscription}`;
+      const id = `${subscriptionNamespace}:${Date.now()}:${++nextSubscription}`;
       let registered = false;
       transport('subscribe', encode({ subscriptionId: id, replayPending: replay }), (json) => {
         let message;

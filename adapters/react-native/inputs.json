@@ -1,0 +1,12 @@
+{
+  "adapters/shared/android/src/main/java": "shared/android/src/main/java",
+  "adapters/shared/ios/AVBridgeSession.m": "shared/ios/AVBridgeSession.m",
+  "adapters/shared/ios/AVNotificationDelegateInstallation.h": "shared/ios/AVNotificationDelegateInstallation.h",
+  "adapters/shared/ios/AVNotificationDelegateInstallation.m": "shared/ios/AVNotificationDelegateInstallation.m",
+  "adapters/shared/ios/include/AvvessaBridge.h": "shared/ios/include/AvvessaBridge.h",
+  "adapters/uniapp/js_sdk/bridge.js": "shared/javascript/bridge.js",
+  "adapters/uniapp/js_sdk/index.d.ts": "shared/javascript/index.d.ts",
+  "native/ios/Sources/Avvessa": "ios/Core/Avvessa",
+  "plugin.json": "avvessa-native.json",
+  "LICENSE": "LICENSE"
+}

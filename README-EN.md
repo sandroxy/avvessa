@@ -4,7 +4,7 @@
 
 Avvessa provides native Android and iOS push APIs on top of the official Jiguang SDKs. Initialize with an AppKey, configure APNs or the required Android vendor channels, and consume notifications, custom messages, and notification interactions.
 
-Supported integrations are native Android and iOS, UNI legacy, classic UTS, and uni-app x. RN and Flutter APIs are not provided. Authentication, account binding, navigation, and server-side sending belong to the application. Call signaling, PushKit/CallKit, call controls, and call UI are outside Avvessa's scope.
+The current release supports native Android and iOS, UNI legacy, classic UTS, and uni-app x. RN and Flutter packages have not been published. Authentication, account binding, navigation, and server-side sending belong to the application. Call signaling, PushKit/CallKit, call controls, and call UI are outside Avvessa's scope.
 
 ## Capabilities
 

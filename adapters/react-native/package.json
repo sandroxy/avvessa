@@ -1,0 +1,60 @@
+{
+  "name": "@sandrox/avvessa",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Jiguang push for React Native on Android and iOS",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "react-native": "index.js",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/sandroxy/avvessa",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sandroxy/avvessa.git",
+    "directory": "adapters/react-native"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "transport.js",
+    "android",
+    "ios",
+    "expo",
+    "shared",
+    "src",
+    "plugin",
+    "app.plugin.js",
+    "react-native.config.js",
+    "expo-module.config.json",
+    "AvvessaReactNative.podspec",
+    "avvessa-native.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "react": "*",
+    "react-native": ">=0.81.0",
+    "@expo/config-plugins": ">=8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@expo/config-plugins": {
+      "optional": true
+    }
+  },
+  "codegenConfig": {
+    "name": "AvvessaSpec",
+    "type": "modules",
+    "jsSrcsDir": "src/specs",
+    "android": {
+      "javaPackageName": "com.sandrox.avvessa.reactnative"
+    },
+    "ios": {
+      "modules": {
+        "Avvessa": {
+          "className": "AvvessaReactNativeModule",
+          "unstableRequiresMainQueueSetup": true
+        }
+      }
+    }
+  }
+}

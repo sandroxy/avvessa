@@ -1,0 +1,66 @@
+plugins {
+    id "com.android.library"
+    id "com.facebook.react" apply false
+}
+
+def newArchitecture = project.hasProperty("newArchEnabled") && project.property("newArchEnabled").toString() == "true"
+if (newArchitecture) apply plugin: "com.facebook.react"
+def metadata = new groovy.json.JsonSlurper().parse(file("../avvessa-native.json"))
+def sdk = metadata.native.android
+def sdkExt = { String name, Object fallback -> rootProject.ext.has(name) ? rootProject.ext.get(name) : fallback }
+def localCore = file("libs/avvessa.aar")
+def vendors = (findProperty("avvessaVendorModules") ?: "").toString().split(",").findAll { !it.isEmpty() }
+def knownVendors = ["xiaomi", "huawei", "oppo", "vivo", "honor", "meizu", "fcm"]
+if (vendors.toSet().size() != vendors.size() || !knownVendors.containsAll(vendors)) {
+    throw new GradleException("Unknown or duplicate avvessaVendorModules")
+}
+
+android {
+    namespace = "com.sandrox.avvessa.reactnative"
+    compileSdk = sdkExt("compileSdkVersion", sdk.compileSdk).toString().toInteger()
+    defaultConfig {
+        minSdk = sdkExt("minSdkVersion", sdk.minimumSdk).toString().toInteger()
+        buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", newArchitecture.toString()
+    }
+    buildFeatures { buildConfig = true }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+    sourceSets.main.java.srcDirs += [
+        newArchitecture ? "src/newarch/java" : "src/legacy/java",
+        "../shared/android/src/main/java"
+    ]
+}
+dependencies {
+    implementation "com.facebook.react:react-android"
+    if (localCore.exists()) {
+        implementation files(localCore)
+        implementation("cn.jiguang.sdk:jpush:${sdk.jpush}") { exclude group: "cn.jiguang.sdk", module: "jcore" }
+        implementation("cn.jiguang.sdk:jcore:${sdk.jcore}") { version { strictly(sdk.jcore) } }
+        implementation "androidx.core:core:1.13.1"
+    } else {
+        implementation "${sdk.group}:${sdk.artifact}:${metadata.version}"
+    }
+    vendors.each { vendor ->
+        def localVendor = file("libs/avvessa-${vendor}.aar")
+        if (localVendor.exists()) {
+            implementation files(localVendor)
+            implementation("cn.jiguang.sdk.plugin:${vendor}:${sdk.vendorPlugin}") { version { strictly(sdk.vendorPlugin) } }
+        } else {
+            implementation("${sdk.group}:avvessa-${vendor}:${metadata.version}") {
+                if (localCore.exists()) exclude group: sdk.group, module: sdk.artifact
+            }
+        }
+    }
+}
+if (newArchitecture) {
+    react {
+        root.set(file(".."))
+        jsRootDir.set(file("../src/specs"))
+        libraryName.set("AvvessaSpec")
+        codegenJavaPackageName.set("com.sandrox.avvessa.reactnative")
+    }
+    tasks.named("generateCodegenSchemaFromJavaScript").configure { jsRootDir.set(file("../src/specs")) }
+    tasks.named("generateCodegenArtifactsFromSchema").configure { packageJsonFile.set(file("../package.json")) }
+}
