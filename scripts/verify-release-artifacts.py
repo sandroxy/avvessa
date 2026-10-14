@@ -41,7 +41,7 @@ def verify(args):
             digest = hashlib.sha256(''.join(name+'\t'+hashlib.sha256(content).hexdigest()+'\n' for name, content in source.items()).encode()).hexdigest()
             if digest != manifest['source']['inputSha256']:
                 raise ValueError('Release source content differs from accepted inputs')
-            package = directory/f'sandrox-avvessa-{version}.tgz'
+            package = directory/f'avvessa-react-native-{version}.tgz'
             expected = manifest['artifacts']['react-native-package']
             if sha(package) != expected or Path(str(package)+'.sha256').read_text().strip() != expected+'  '+package.name:
                 raise ValueError('npm tarball/checksum differs from accepted bytes')

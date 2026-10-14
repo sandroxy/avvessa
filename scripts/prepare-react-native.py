@@ -55,7 +55,10 @@ def prepare(output, pack=False):
         packed = json.loads(result)
         if len(packed) != 1:
             raise ValueError('npm pack must produce exactly one tarball')
-        print(output / packed[0]['filename'])
+        archive = output / packed[0]['filename']
+        public_archive = output / f"avvessa-react-native-{package['version']}.tgz"
+        archive.rename(public_archive)
+        print(public_archive)
     else:
         print(output)
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
 require "json"
+require "digest"
 require "open3"
 require "optparse"
 require "pathname"
@@ -29,7 +30,22 @@ candidate_path = Pathname.new(options[:candidate]).realpath
 candidate = JSON.parse(candidate_path.read)
 version = candidate.fetch("version")
 artifacts = candidate.fetch("artifacts").to_h { |entry| [entry.fetch("role"), entry] }
-path = ->(role) { candidate_path.parent.join(artifacts.fetch(role).fetch("file")).to_s }
+paths = artifacts.transform_values { |entry| candidate_path.parent.join(entry.fetch("file")) }
+if %w[github npm].include?(options[:channel])
+  # Public filenames may differ from the frozen candidate's filenames; accepted package bytes must not.
+  archive = candidate_path.parent.join("avvessa-react-native-#{version}.tgz")
+  checksum = Pathname.new("#{archive}.sha256")
+  accepted = artifacts.fetch("react-native-package")
+  abort("Public RN tarball is missing or symbolic: #{archive}") unless archive.file? && !archive.symlink?
+  abort("Public RN tarball differs from the accepted bytes") unless
+    archive.size == accepted.fetch("bytes") && Digest::SHA256.file(archive).hexdigest == accepted.fetch("sha256")
+  abort("Public RN checksum is missing or symbolic: #{checksum}") unless checksum.file? && !checksum.symlink?
+  abort("Public RN checksum must name the public tarball") unless
+    checksum.read == "#{accepted.fetch('sha256')}  #{archive.basename}\n"
+  paths["react-native-package"] = archive
+  paths["checksum-react-native-package"] = checksum
+end
+path = ->(role) { paths.fetch(role).to_s }
 puts "Verified #{candidate.fetch('candidateId')}. Instructions only; nothing was uploaded or published."
 
 case options[:channel]

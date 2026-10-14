@@ -55,8 +55,8 @@ jobs:
               '.isDraft == false and .isPrerelease == false and .tagName == $version' >/dev/null
           mkdir -p dist
           gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" \
-            --pattern "sandrox-avvessa-$VERSION.tgz" \
-            --pattern "sandrox-avvessa-$VERSION.tgz.sha256" \
+            --pattern "avvessa-react-native-$VERSION.tgz" \
+            --pattern "avvessa-react-native-$VERSION.tgz.sha256" \
             --pattern "avvessa-native-$VERSION.json" --dir dist
           for artifact in avvessa avvessa-xiaomi avvessa-huawei avvessa-oppo avvessa-vivo avvessa-honor avvessa-meizu avvessa-fcm; do
             curl --fail --location --retry 20 --retry-all-errors --retry-delay 15 \
@@ -103,5 +103,5 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          npm publish "./dist/sandrox-avvessa-$VERSION.tgz" \
+          npm publish "./dist/avvessa-react-native-$VERSION.tgz" \
             --access public --ignore-scripts --provenance --registry https://registry.npmjs.org/
