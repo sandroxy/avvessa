@@ -81,6 +81,12 @@ node --test adapters/uniapp/tests/*.test.mjs
 
 These isolated tests do not replace Android/iOS builds or device checks. Verify both module architectures, APNs forwarding, other notification delegates, React reload/unmount, pending replay, permissions and all consumer scenarios before publication. Changes to shared iOS session construction also require UNI bridge compilation and lifecycle regression.
 
+## Local workspace lifetime
+
+Reuse the documented `.build` directories and existing dependency locks for repeated builds. Do not create a fresh checkout, dependency tree or SDK copy for each candidate hash. Consumer applications, private application configuration and their lifecycle belong to the integration repository; its `verification/avvessa/README.md` defines fixed consumer locations and retirement commands.
+
+Build output is reproducible, but a directory being ignored by Git does not make all its contents disposable. Keep private configuration outside generated consumers, and retain original logs and acceptance evidence separately from compiler outputs. Frozen release inputs follow [RELEASING.md](RELEASING.md); do not remove or replace them as part of cache cleanup. Project cleanup does not require clearing shared Gradle, package-manager or CocoaPods caches.
+
 ## Android builds and tests
 
 Use JDK 17 and Android SDK API 36. Set `JAVA_HOME` and `ANDROID_HOME`, or set `sdk.dir` in the ignored `native/android/local.properties`.
