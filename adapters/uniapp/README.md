@@ -39,6 +39,8 @@ legacy 还需在 `manifest.json` 的 `app-plus.nativePlugins` 选择本地 `Sand
 
 同一应用只安装一种 Avvessa 接入方式，不能同时安装其他 JPush 包装器。安装或更新原生组件后，重新构建应用或自定义基座；标准基座不包含 Avvessa。宿主负责 DCloud AppID、离线打包授权、包名与签名，这些配置与极光 AppKey 相互独立。
 
+升级前，保存应用的私有配置、通知图标和需要合并的宿主清单内容，再用新版本原始插件包替换旧插件目录，避免遗留旧的厂商组件或 JAR。Android 接入还需按照下文重新选择厂商通道，并使用同版本源码中的工具重新生成、安装应用配置 AAR，合并生成的宿主清单后再构建应用或自定义基座。原有应用配置 AAR 不会随插件升级自动更新；重新生成时仍使用本应用的配置和服务 JSON。
+
 ## 配置 iOS
 
 在极光控制台为应用配置有效的 APNs 凭据；应用 Bundle ID 必须与该极光应用及 Apple 配置一致。签名需包含 Push Notifications 能力，并启用 Background Modes → Remote notifications。

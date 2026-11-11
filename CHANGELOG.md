@@ -1,5 +1,10 @@
 # 更新日志
 
+## 1.1.1
+
+- 修复 UNI Android 启用 FCM 时，Google Services 生成的 Firebase 配置资源可能未进入应用配置 AAR 的问题，并在资源缺失或值不一致时明确报错。
+- 修复 UNI Android 启用 FCM 时，`javax.inject` 重复打包导致的重复类构建错误。
+
 ## 1.1.0
 
 - 新增 React Native Android、iOS 接入，提供旧桥和 TurboModule 入口，复用原生推送核心及公共事件契约。
