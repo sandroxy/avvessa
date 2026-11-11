@@ -95,6 +95,8 @@ python3 scripts/prepare-uniapp-android.py \
   --config /absolute/path/to/consumer.local.json
 ```
 
+启用 FCM 时，工具通过 Google Services 任务声明的输出生成资源，并核对其字符串配置是否完整保留在 AAR 中；缺失或值不一致时失败。该检查不验证控制台配置或消息投递。
+
 命令打印资源 AAR 和宿主清单路径：
 
 1. 将 `configuration-release.aar` 复制到 legacy 包的 `android/avvessa-consumer.aar`，或 UTS 包的 `utssdk/app-android/libs/avvessa-consumer.aar`。

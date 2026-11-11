@@ -96,10 +96,72 @@ def prepare(args):
         source=Path(android['googleServicesFile']);config=json.loads(source.read_text())
         if not any(c.get('client_info',{}).get('android_client_info',{}).get('package_name')==identity for c in config.get('client',[])): raise SystemExit('Firebase service package differs')
         write('services/google-services.json',source.read_text());service+="apply plugin: 'com.google.gms.google-services'\n"
-        resources.append('../services/build/generated/res/google-services/release');tasks.append(':services:processReleaseGoogleServices')
+        # Publish the task's declared output; its directory layout belongs to Google Services.
+        service+="""
+configurations.create('firebaseResources') {
+    canBeConsumed = true
+    canBeResolved = false
+}
+androidComponents.onVariants(androidComponents.selector().withBuildType('release')) { variant ->
+    def googleServices = tasks.named('processReleaseGoogleServices')
+    project.artifacts.add('firebaseResources', googleServices.flatMap { it.outputDirectory }) {
+        builtBy(googleServices)
+    }
+}
+"""
     write('services/build.gradle',service);write('services/src/main/AndroidManifest.xml','<manifest />\n')
     library="plugins { id 'com.android.library' }\nandroid { namespace 'com.sandrox.avvessa.uniconfiguration'; compileSdk 36; defaultConfig { minSdk 21 }; sourceSets.main.res.srcDirs += "+json.dumps(resources)+" }\n"
     if tasks: library+="tasks.configureEach { if (name == 'preReleaseBuild') { dependsOn("+','.join(json.dumps(t) for t in tasks)+") } }\n"
+    if 'fcm' in vendors:
+        library+="""
+def firebaseResources = configurations.create('firebaseResources') {
+    canBeConsumed = false
+    canBeResolved = true
+}
+dependencies.add('firebaseResources', dependencies.project(path: ':services', configuration: 'firebaseResources'))
+def firebaseDirectory = layout.buildDirectory.dir('generated/firebase')
+def stageFirebaseResources = tasks.register('stageFirebaseResources', Sync) {
+    from(firebaseResources)
+    into(firebaseDirectory)
+}
+android.sourceSets.main.res.srcDir(firebaseDirectory)
+tasks.configureEach {
+    if (name == 'preReleaseBuild') { dependsOn(stageFirebaseResources) }
+}
+
+tasks.register('verifyFirebaseResources') {
+    dependsOn('bundleReleaseAar', firebaseResources)
+    def archive = layout.buildDirectory.file('outputs/aar/configuration-release.aar')
+    inputs.file(archive)
+    inputs.files(firebaseResources)
+    doLast {
+        def generated = new File(firebaseResources.singleFile, 'values/values.xml')
+        def expected = new groovy.xml.XmlSlurper().parse(generated).string.collectEntries {
+            [(it.@name.text()): it.text()]
+        }
+        if (expected.isEmpty()) {
+            throw new GradleException('Google Services generated no Firebase string resources')
+        }
+        def actual = [:]
+        new java.util.zip.ZipFile(archive.get().asFile).withCloseable { zip ->
+            zip.entries().each { entry ->
+                if (entry.name.startsWith('res/values/') && entry.name.endsWith('.xml')) {
+                    zip.getInputStream(entry).withCloseable { stream ->
+                        new groovy.xml.XmlSlurper().parse(stream).string.each {
+                            actual[it.@name.text()] = it.text()
+                        }
+                    }
+                }
+            }
+        }
+        expected.each { name, value ->
+            if (actual[name] != value) {
+                throw new GradleException("Firebase resource missing or changed in consumer AAR: ${name}")
+            }
+        }
+    }
+}
+"""
     write('configuration/build.gradle',library)
     manifest=ET.Element('manifest'); app=ET.SubElement(manifest,'application'); strings=ET.Element('resources')
     def resource_string(value):
@@ -135,7 +197,9 @@ def prepare(args):
     for old in resources_root.glob('drawable*/avvessa_consumer_notification.*'): old.unlink()
     for relative,content in icons.items():
         target=resources_root/relative;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(content);target.chmod(0o600)
-    subprocess.run([str(ROOT/'native/android/gradlew'),'-p',str(work),':configuration:assembleRelease','--console=plain'],check=True)
+    build_tasks=[':configuration:assembleRelease']
+    if 'fcm' in vendors: build_tasks.append(':configuration:verifyFirebaseResources')
+    subprocess.run([str(ROOT/'native/android/gradlew'),'-p',str(work),*build_tasks,'--console=plain'],check=True)
     print(work/'configuration/build/outputs/aar/configuration-release.aar')
     print(work/'AndroidManifest.xml')
 

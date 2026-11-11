@@ -149,6 +149,14 @@ python3 scripts/package-uniapp.py \
 
 Local packages are written to `dist/uniapp/`. Optional `--vendors huawei,honor,xiaomi,meizu,oppo,vivo` selects transports for a source build; formal release packaging instead includes an inactive vendor kit. Application resources are prepared separately as described in the [UNI guide](adapters/uniapp/README.md#配置-android).
 
+The consumer resource build regression uses synthetic service configuration and the Android toolchain above:
+
+```sh
+python3 scripts/tests/check_android_resource_build.py
+```
+
+It checks clean and incremental builds, client and vendor selection changes, Google Services output relocation, FCM dependency packaging, and rejection of missing or altered Firebase resources in the AAR. Generated inputs and logs remain in `.build/android-resource-tests`; this check does not initialize a push SDK or require service credentials. Packaged consumer and final APK checks belong to the integration repository.
+
 UNI iOS archives contain arm64 device frameworks. `scripts/build-uniapp-ios.py --sdk iphonesimulator` builds simulator components separately; device frameworks cannot be used in a simulator. The builder also links an unsigned probe for missing SDK symbols and Swift runtime dependencies.
 
 After packaging:

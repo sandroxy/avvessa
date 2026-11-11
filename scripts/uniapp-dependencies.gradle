@@ -17,8 +17,12 @@ gradle.projectsEvaluated {
                     if (!(artifact.id.componentIdentifier instanceof org.gradle.api.artifacts.component.ProjectComponentIdentifier)) {
                         def id = artifact.moduleVersion.id
                         def coordinate = "${id.group}:${id.name}:${id.version}"
+                        // Firebase's Maven graph also brings javax.inject; a local JAR would duplicate its classes.
+                        def mavenDependency = id.group == 'cn.jiguang.sdk' || id.group.startsWith('androidx.') ||
+                            id.group.startsWith('org.jetbrains') || id.group.startsWith('com.google') ||
+                            (id.group == 'javax.inject' && id.name == 'javax.inject')
                         records[coordinate] = [coordinate: coordinate, file: artifact.file.absolutePath,
-                            bundled: !(id.group == 'cn.jiguang.sdk' || id.group.startsWith('androidx.') || id.group.startsWith('org.jetbrains') || id.group.startsWith('com.google'))]
+                            bundled: !mavenDependency]
                     }
             }
             def destination = new File(rootProject.property('avvessaDependencyReport').toString())
