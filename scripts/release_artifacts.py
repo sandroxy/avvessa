@@ -8,12 +8,51 @@ import zipfile
 
 VENDORS = ('fcm','honor','huawei','meizu','oppo','vivo','xiaomi')
 MODULES = ('avvessa',)+tuple('avvessa-'+v for v in VENDORS)
+NATIVE_MANIFEST_SCHEMA = 2
+MAVEN_CHECKSUMS = ('md5', 'sha1', 'sha256')
 
 
 def sha(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 def write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value,ensure_ascii=False,indent=2)+'\n')
+
+
+def write_maven_checksums(payloads):
+    """Checksum payloads only; detached signatures are verified with GPG."""
+    for path in payloads:
+        content = path.read_bytes()
+        for algorithm in MAVEN_CHECKSUMS:
+            Path(str(path)+'.'+algorithm).write_text(hashlib.new(algorithm, content).hexdigest()+'\n')
+
+
+def verify_maven(archive, manifest, artifacts, version):
+    schema = manifest['schemaVersion']
+    if type(schema) is not int or schema not in (1, 2):
+        raise ValueError('Unsupported native manifest schema')
+    payloads = {f'io/github/sandroxy/{module}/{version}/{module}-{version}{suffix}' for module in MODULES
+                for suffix in ('.aar', '.pom', '.module', '-sources.jar', '-javadoc.jar')}
+    if set(manifest['mavenPayloads']) != payloads:
+        raise ValueError('Maven payload inventory mismatch')
+    signatures = {name+'.asc' for name in payloads} if manifest['signingFingerprint'] else set()
+    algorithms = ('md5', 'sha1', 'sha256', 'sha512') if schema == 1 else MAVEN_CHECKSUMS
+    checksummed = payloads | signatures if schema == 1 else payloads
+    expected = payloads | signatures | {name+'.'+algorithm for name in checksummed for algorithm in algorithms}
+    if set(archive.namelist()) != expected:
+        raise ValueError('Maven archive inventory differs from native manifest schema')
+    for name, digest in manifest['mavenPayloads'].items():
+        if hashlib.sha256(archive.read(name)).hexdigest() != digest:
+            raise ValueError('Maven payload mismatch: '+name)
+    for name in checksummed:
+        content = archive.read(name)
+        for algorithm in algorithms:
+            if archive.read(name+'.'+algorithm).decode('ascii').strip() != hashlib.new(algorithm, content).hexdigest():
+                raise ValueError('Maven '+algorithm+' mismatch: '+name)
+    for module in MODULES:
+        role = 'native-android-'+('core' if module == 'avvessa' else module[8:])+'-aar'
+        entry = f'io/github/sandroxy/{module}/{version}/{module}-{version}.aar'
+        if hashlib.sha256(archive.read(entry)).hexdigest() != sha(artifacts[role]):
+            raise ValueError('Maven AAR mismatch')
 
 
 def zip_tree(root, destination):
@@ -98,15 +137,7 @@ def verify_packages(artifacts, version):
             verify_react_native(artifacts['react-native-package'], version,
                 {name: source.read(name) for name in source.namelist() if not name.endswith('/')})
     with read_zip(artifacts['native-android-maven-repository']) as maven:
-        expected={f'io/github/sandroxy/{module}/{version}/{module}-{version}{suffix}' for module in MODULES
-                  for suffix in ('.aar','.pom','.module','-sources.jar','-javadoc.jar')}
-        if set(manifest['mavenPayloads'])!=expected: raise ValueError('Maven payload inventory mismatch')
-        for name,digest in manifest['mavenPayloads'].items():
-            if hashlib.sha256(maven.read(name)).hexdigest()!=digest: raise ValueError('Maven payload mismatch: '+name)
-        for module in MODULES:
-            role='native-android-'+('core' if module=='avvessa' else module[8:])+'-aar'
-            entry=f'io/github/sandroxy/{module}/{version}/{module}-{version}.aar'
-            if hashlib.sha256(maven.read(entry)).hexdigest()!=sha(artifacts[role]): raise ValueError('Maven AAR mismatch')
+        verify_maven(maven, manifest, artifacts, version)
     ios_hash=manifest['iosDeviceBinarySha256']
     with read_zip(artifacts['native-ios-xcframework']) as archive:
         binary='Avvessa.xcframework/ios-arm64/Avvessa.framework/Avvessa'

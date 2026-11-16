@@ -13,7 +13,8 @@ module MavenSignatures
     output
   end
 
-  def verify!(repository:, aars:, version:, signer:)
+  def verify!(repository:, aars:, version:, signer:, manifest_schema:)
+    raise Error, "Unsupported native manifest schema" unless manifest_schema.is_a?(Integer) && [1, 2].include?(manifest_schema)
     raise Error, "An explicit signing fingerprint is required" unless
       signer.is_a?(String) && signer.match?(/\A(?:[0-9A-F]{40}|[0-9A-F]{64})\z/)
     raise Error, "Unexpected Maven version or artifacts" unless
@@ -23,9 +24,10 @@ module MavenSignatures
       prefix = "io/github/sandroxy/#{name}/#{version}/#{name}-#{version}"
       [".aar", ".pom", ".module", "-sources.jar", "-javadoc.jar"].map { |suffix| prefix + suffix }
     end
-    expected = payloads.flat_map do |path|
-      [path, path + ".asc"].flat_map { |name| [name] + HASHES.keys.map { |hash| name + "." + hash } }
-    end.sort
+    hashes = manifest_schema == 1 ? HASHES : HASHES.reject { |name, _type| name == "sha512" }
+    signatures = payloads.map { |path| path + ".asc" }
+    checksummed = manifest_schema == 1 ? payloads + signatures : payloads
+    expected = (payloads + signatures + checksummed.flat_map { |path| hashes.keys.map { |hash| path + "." + hash } }).sort
     entries = command("unzip", "-Z1", repository).lines.map(&:chomp)
     raise Error, "Maven archive contains unexpected, duplicate or unsafe entries" unless entries.sort == expected
     Dir.mktmpdir("avvessa-maven-signatures-") do |directory|
@@ -33,7 +35,8 @@ module MavenSignatures
         [path, path + ".asc"].each do |entry|
           content = command("unzip", "-p", repository, entry)
           File.binwrite(File.join(directory, File.basename(entry)), content)
-          HASHES.each do |algorithm, type|
+          next unless checksummed.include?(entry)
+          hashes.each do |algorithm, type|
             recorded = command("unzip", "-p", repository, entry + "." + algorithm).strip
             raise Error, "Maven #{algorithm} mismatch: #{entry}" unless recorded == type.hexdigest(content)
           end

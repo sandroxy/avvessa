@@ -91,7 +91,7 @@ aars = %w[avvessa avvessa-fcm avvessa-honor avvessa-huawei avvessa-meizu avvessa
 end
 begin
   MavenSignatures.verify!(repository: artifacts.fetch("native-android-maven-repository"), aars: aars,
-    version: version, signer: native_manifest.fetch("signingFingerprint"))
+    version: version, signer: native_manifest.fetch("signingFingerprint"), manifest_schema: native_manifest.fetch("schemaVersion"))
 rescue MavenSignatures::Error => error
   abort(error.message)
 end

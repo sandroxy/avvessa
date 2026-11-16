@@ -8,7 +8,8 @@ import re
 import shutil
 import subprocess
 import tempfile
-from release_artifacts import MODULES, VENDORS, sha, write_json, zip_tree, verify_packages
+from release_artifacts import (MODULES, VENDORS, NATIVE_MANIFEST_SCHEMA, sha, write_json,
+                               zip_tree, write_maven_checksums, verify_packages)
 
 ROOT=Path(__file__).resolve().parent.parent
 
@@ -63,20 +64,16 @@ def prepare(args):
         role='native-android-'+('core' if name=='avvessa' else name[8:])+'-aar'
         artifacts[role]=out/f'{name}-{version}.aar';shutil.copy2(repository/path/f'{name}-{version}.aar',artifacts[role])
     for path in payloads:
-        contents=[path]
         if args.signing_fingerprint:
             run('gpg','--batch','--armor','--local-user',args.signing_fingerprint,'--detach-sign','--output',str(path)+'.asc',path)
-            contents.append(Path(str(path)+'.asc'))
-        for content in contents:
-            for algorithm in ('md5','sha1','sha256','sha512'):
-                Path(str(content)+'.'+algorithm).write_text(hashlib.new(algorithm,content.read_bytes()).hexdigest()+'\n')
+    write_maven_checksums(payloads)
     artifacts['native-android-maven-repository']=out/f'avvessa-{version}-maven.zip'
     zip_tree(bundle,artifacts['native-android-maven-repository'])
     if args.signing_fingerprint:
         # Verify every signature against the explicitly selected identity, not just .asc presence.
-        expression="require ARGV.shift; a=JSON.parse(ARGV.shift); MavenSignatures.verify!(repository:ARGV[0],aars:a,version:ARGV[1],signer:ARGV[2])"
+        expression="require ARGV.shift; a=JSON.parse(ARGV.shift); MavenSignatures.verify!(repository:ARGV[0],aars:a,version:ARGV[1],signer:ARGV[2],manifest_schema:Integer(ARGV[3]))"
         aars={m:str(artifacts['native-android-'+('core' if m=='avvessa' else m[8:])+'-aar']) for m in MODULES}
-        run('ruby','-rjson','-e',expression,ROOT/'scripts/verify-maven-signatures.rb',json.dumps(aars),artifacts['native-android-maven-repository'],version,args.signing_fingerprint)
+        run('ruby','-rjson','-e',expression,ROOT/'scripts/verify-maven-signatures.rb',json.dumps(aars),artifacts['native-android-maven-repository'],version,args.signing_fingerprint,NATIVE_MANIFEST_SCHEMA)
     # Resolve each optional graph independently. Nothing under tools/ is loaded by a UNI runtime.
     kit=work/'vendors'
     if kit.exists(): shutil.rmtree(kit)
@@ -132,7 +129,7 @@ def prepare(args):
     shutil.copy2(npm, artifacts['react-native-package'])
     if source_digest(source_files())!=digest or capture('git','rev-parse','HEAD')!=commit:
         raise ValueError('Source changed during preparation; outputs are not qualified')
-    manifest={'schemaVersion':1,'kind':'avvessa-native-release','version':version,
+    manifest={'schemaVersion':NATIVE_MANIFEST_SCHEMA,'kind':'avvessa-native-release','version':version,
         'source':{'repository':meta['repository'],'commit':commit,'dirty':dirty,'inputSha256':digest},
         'signingFingerprint':args.signing_fingerprint,'vendorKitSha256':sha(kit_archive),
         'mavenPayloads':{path.relative_to(bundle).as_posix():sha(path) for path in payloads},

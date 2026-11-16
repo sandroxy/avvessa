@@ -61,6 +61,17 @@ when "github"
   puts "The source ZIP and its checksum remain local candidate inputs. SPM and public configuration tools use the release Git tag."
   puts "The Maven ZIP belongs in Central Portal; other candidate checksums remain local acceptance evidence."
 when "maven"
+  summary_script = <<~PYTHON
+    import os, sys, zipfile
+    with zipfile.ZipFile(sys.argv[1]) as bundle:
+        entries = bundle.infolist()
+        print(f"Maven bundle: {len(entries)} files; {sum(entry.file_size for entry in entries)} bytes uncompressed; {os.path.getsize(sys.argv[1])} bytes ZIP.")
+  PYTHON
+  summary, status = Open3.capture2e("python3", "-c", summary_script, path.call("native-android-maven-repository"))
+  abort(summary) unless status.success?
+  puts summary
+  puts "Before upload, select the organization owning io.github.sandroxy in Central Portal's Usage Center."
+  puts "Check its remaining monthly file count, release size and release count, including other plugins in that organization."
   puts "In https://central.sonatype.com/publishing upload this signed Central bundle in user-managed mode:"
   puts path.call("native-android-maven-repository")
   puts "Deployment Name: avvessa-#{version}. Publish after portal validation."

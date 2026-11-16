@@ -8,6 +8,7 @@ class MavenSignaturesTest < Minitest::Test
     @repository = File.join(@temporary, "repository.zip")
     @signer = "A" * 40
     @reported_signer = @signer
+    @manifest_schema = 2
     @files = {}
     @payloads = %w[avvessa avvessa-fcm avvessa-honor avvessa-huawei avvessa-meizu avvessa-oppo avvessa-vivo avvessa-xiaomi].flat_map do |name|
       [".aar", ".pom", ".module", "-sources.jar", "-javadoc.jar"].map do |suffix|
@@ -36,7 +37,18 @@ class MavenSignaturesTest < Minitest::Test
 
   def set_file(path, content)
     @files[path] = content
-    MavenSignatures::HASHES.each { |name, type| @files[path + "." + name] = type.hexdigest(content) }
+    return if path.end_with?(".asc") && @manifest_schema == 2
+    algorithms = @manifest_schema == 1 ? %w[md5 sha1 sha256 sha512] : %w[md5 sha1 sha256]
+    algorithms.each { |name| @files[path + "." + name] = MavenSignatures::HASHES.fetch(name).hexdigest(content) }
+  end
+
+  def use_schema(schema)
+    @manifest_schema = schema
+    original = @files
+    @files = {}
+    @payloads.each do |path|
+      [path, path + ".asc"].each { |entry| set_file(entry, original.fetch(entry)) }
+    end
   end
 
   def archive
@@ -69,12 +81,15 @@ class MavenSignaturesTest < Minitest::Test
       end
     end
     MavenSignatures.stub(:command, inspection) do
-      MavenSignatures.verify!(repository: @repository, aars: @aars, version: "1.0.0", signer: @signer)
+      MavenSignatures.verify!(repository: @repository, aars: @aars, version: "1.0.0", signer: @signer,
+        manifest_schema: @manifest_schema)
     end
   end
 
   def test_all_core_and_vendor_payloads_and_signatures_are_checked
     verify
+    assert_equal 200, @files.length
+    assert @files.keys.none? { |name| name.end_with?(".sha512") || name.include?(".asc.") }
     assert_equal 40, @verified.length
   end
 
@@ -86,21 +101,44 @@ class MavenSignaturesTest < Minitest::Test
   end
 
   def test_missing_signatures_and_extra_files_are_rejected
-    signature = @payloads.first + ".asc"
-    original = @files.delete(signature)
-    assert_raises(MavenSignatures::Error) { verify }
-    @files[signature] = original
-    @files["unexpected.txt"] = "extra"
-    assert_raises(MavenSignatures::Error) { verify }
+    [".asc", ".md5", ".sha1", ".sha256", ""].each do |suffix|
+      entry = @payloads.first + suffix
+      original = @files.delete(entry)
+      assert_raises(MavenSignatures::Error) { verify }
+      @files[entry] = original
+    end
+    ["unexpected.txt", @payloads.first + ".sha512", @payloads.first + ".asc.sha256"].each do |entry|
+      @files[entry] = "extra"
+      assert_raises(MavenSignatures::Error) { verify }
+      @files.delete(entry)
+    end
   end
 
-  def test_payload_and_signature_checksums_are_checked
+  def test_all_required_payload_checksums_are_checked
     path = @payloads.first
-    @files[path + ".sha256"] = "f" * 64
-    assert_match(/sha256 mismatch/, assert_raises(MavenSignatures::Error) { verify }.message)
-    set_file(path, @files.fetch(path))
+    %w[md5 sha1 sha256].each do |algorithm|
+      @files[path + "." + algorithm] = "incorrect"
+      assert_match(/#{algorithm} mismatch/, assert_raises(MavenSignatures::Error) { verify }.message)
+      set_file(path, @files.fetch(path))
+    end
+  end
+
+  def test_manifest_schema_selects_an_exact_inventory_without_fallback
+    [nil, 0, 3, "2"].each do |schema|
+      @manifest_schema = schema
+      assert_match(/Unsupported native manifest schema/, assert_raises(MavenSignatures::Error) { verify }.message)
+    end
+    @manifest_schema = 1
+    assert_match(/unexpected/, assert_raises(MavenSignatures::Error) { verify }.message)
+    use_schema(1)
+    verify
+    assert_equal 400, @files.length
+    assert_equal 40, @verified.length
+    path = @payloads.first
     @files[path + ".asc.sha512"] = "f" * 128
     assert_match(/sha512 mismatch/, assert_raises(MavenSignatures::Error) { verify }.message)
+    @manifest_schema = 2
+    assert_match(/unexpected/, assert_raises(MavenSignatures::Error) { verify }.message)
   end
 
   def test_standalone_vendor_cannot_differ_from_signed_maven_bytes
@@ -127,6 +165,10 @@ class MavenSignaturesTest < Minitest::Test
     end
     verify(real_gpg: true)
     path = @payloads.find { |entry| entry.end_with?("avvessa-xiaomi-1.0.0.pom") }
+    signature = @files.fetch(path + ".asc")
+    @files[path + ".asc"] = "invalid detached signature"
+    assert_raises(MavenSignatures::Error) { verify(real_gpg: true) }
+    @files[path + ".asc"] = signature
     set_file(path, "changed metadata with valid checksum sidecars")
     assert_raises(MavenSignatures::Error) { verify(real_gpg: true) }
   end

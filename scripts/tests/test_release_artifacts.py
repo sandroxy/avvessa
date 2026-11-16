@@ -10,9 +10,107 @@ import unittest
 import zipfile
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from release_artifacts import read_zip, zip_tree, read_npm, verify_react_native
+from release_artifacts import (MODULES, NATIVE_MANIFEST_SCHEMA, read_zip, zip_tree, read_npm,
+                               verify_react_native, write_maven_checksums, verify_maven)
 spec=importlib.util.spec_from_file_location('vendors',Path(__file__).resolve().parents[1]/'configure-uniapp-vendors.py')
 vendors=importlib.util.module_from_spec(spec);spec.loader.exec_module(vendors)
+
+
+class MavenBundleTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.bundle = self.root/'central'
+        self.archive = self.root/'maven.zip'
+        self.payloads = []
+        self.artifacts = {}
+        self.manifest = {'schemaVersion': NATIVE_MANIFEST_SCHEMA, 'signingFingerprint': 'A'*40, 'mavenPayloads': {}}
+        for module in MODULES:
+            for suffix in ('.aar', '.pom', '.module', '-sources.jar', '-javadoc.jar'):
+                name = f'io/github/sandroxy/{module}/1.0.0/{module}-1.0.0{suffix}'
+                path = self.bundle/name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(name.encode())
+                self.payloads.append(path)
+                self.manifest['mavenPayloads'][name] = hashlib.sha256(path.read_bytes()).hexdigest()
+                Path(str(path)+'.asc').write_text('signature fixture')
+                if suffix == '.aar':
+                    copy = self.root/(module+'.aar')
+                    copy.write_bytes(path.read_bytes())
+                    self.artifacts['native-android-'+('core' if module == 'avvessa' else module[8:])+'-aar'] = copy
+        write_maven_checksums(self.payloads)
+
+    def verify(self):
+        zip_tree(self.bundle, self.archive)
+        with read_zip(self.archive) as archive:
+            verify_maven(archive, self.manifest, self.artifacts, '1.0.0')
+            return len(archive.namelist())
+
+    def test_signed_bundle_keeps_all_payloads_and_uses_200_files(self):
+        self.assertEqual(NATIVE_MANIFEST_SCHEMA, 2)
+        self.assertEqual(len(self.manifest['mavenPayloads']), 40)
+        self.assertEqual(self.verify(), 200)
+        self.assertFalse(list(self.bundle.rglob('*.sha512')))
+        self.assertFalse(list(self.bundle.rglob('*.asc.*')))
+
+    def test_unsigned_rehearsal_is_explicit_and_cannot_omit_signed_inputs(self):
+        for path in self.payloads:
+            Path(str(path)+'.asc').unlink()
+        with self.assertRaisesRegex(ValueError, 'inventory'):
+            self.verify()
+        self.manifest['signingFingerprint'] = None
+        self.assertEqual(self.verify(), 160)
+
+    def test_incomplete_mixed_or_extra_files_are_rejected(self):
+        for suffix in ('', '.asc', '.md5', '.sha1', '.sha256'):
+            with self.subTest(missing=suffix):
+                path = Path(str(self.payloads[0])+suffix)
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaisesRegex(ValueError, 'inventory'):
+                    self.verify()
+                path.write_bytes(original)
+        for suffix in ('.sha512', '.asc.md5', '.asc.sha256', '.unexpected'):
+            with self.subTest(extra=suffix):
+                path = Path(str(self.payloads[0])+suffix)
+                path.write_text('extra')
+                with self.assertRaisesRegex(ValueError, 'inventory'):
+                    self.verify()
+                path.unlink()
+
+    def test_hashes_and_standalone_aars_must_match(self):
+        for algorithm in ('md5', 'sha1', 'sha256'):
+            path = Path(str(self.payloads[0])+'.'+algorithm)
+            original = path.read_bytes()
+            path.write_text('incorrect')
+            with self.assertRaisesRegex(ValueError, algorithm+' mismatch'):
+                self.verify()
+            path.write_bytes(original)
+        self.artifacts['native-android-xiaomi-aar'].write_bytes(b'replaced vendor')
+        with self.assertRaisesRegex(ValueError, 'Maven AAR mismatch'):
+            self.verify()
+
+    def test_schema_is_explicit_and_preserves_full_legacy_inventory(self):
+        for schema in (None, 0, 3, '2', True):
+            self.manifest['schemaVersion'] = schema
+            with self.assertRaisesRegex(ValueError, 'Unsupported native manifest schema'):
+                self.verify()
+        self.manifest['schemaVersion'] = 1
+        with self.assertRaisesRegex(ValueError, 'inventory'):
+            self.verify()
+        for payload in self.payloads:
+            for path in (payload, Path(str(payload)+'.asc')):
+                for algorithm in ('md5', 'sha1', 'sha256', 'sha512'):
+                    Path(str(path)+'.'+algorithm).write_text(hashlib.new(algorithm, path.read_bytes()).hexdigest()+'\n')
+        self.assertEqual(self.verify(), 400)
+        path = Path(str(self.payloads[0])+'.asc.sha512')
+        path.write_text('incorrect')
+        with self.assertRaisesRegex(ValueError, 'sha512 mismatch'):
+            self.verify()
+        self.manifest['schemaVersion'] = 2
+        with self.assertRaisesRegex(ValueError, 'inventory'):
+            self.verify()
 
 
 class DistributionTests(unittest.TestCase):

@@ -1,9 +1,10 @@
 # 更新日志
 
-## 1.1.1
+## 1.2.0
 
 - 修复 UNI Android 启用 FCM 时，Google Services 生成的 Firebase 配置资源可能未进入应用配置 AAR 的问题，并在资源缺失或值不一致时明确报错。
 - 修复 UNI Android 启用 FCM 时，`javax.inject` 重复打包导致的重复类构建错误。
+- 精简 Maven 发布包中的冗余校验文件，保留全部模块、源码、文档及 GPG 签名。
 
 ## 1.1.0
 

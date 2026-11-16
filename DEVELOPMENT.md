@@ -135,6 +135,15 @@ python3 scripts/ios-privacy.py \
 
 After an SDK update, review the upstream device/simulator declarations, then run the privacy command without `--check` to regenerate the bundled union. Keep package declarations and `Package.resolved` consistent with `plugin.json`.
 
+## Release packaging checks
+
+```sh
+python3 -m unittest discover -s scripts/tests -v
+ruby scripts/test-maven-signatures.rb
+```
+
+These isolated checks cover archive inventories, required checksums, package consistency and real GPG signature verification. The GPG tests use a temporary keyring and signing key. They do not build applications, use release signing keys or modify frozen candidates. Bundle formats and publication checks are defined in [RELEASING.md](RELEASING.md).
+
 ## UNI package builds and checks
 
 Install the Android and iOS toolchains above and the official DCloud Android AAR and iOS SDK locally. Resolve the root Swift package and build the adapters:
@@ -163,7 +172,6 @@ After packaging:
 
 ```sh
 node --test adapters/uniapp/tests/*.test.mjs
-python3 -m unittest discover -s scripts/tests -v
 native/android/gradlew -p adapters/android \
   -PavvessaCoreAar="$PWD/native/android/avvessa/build/outputs/aar/avvessa-release.aar" \
   :bridge:testDebugUnitTest
