@@ -89,6 +89,15 @@ UNI reuses `avvessa-legacy`, `avvessa-uts` and `avvessa-x` across source, artifa
 
 Build output is reproducible, but a directory being ignored by Git does not make all its contents disposable. Keep private configuration outside generated consumers, and retain original logs and acceptance evidence separately from compiler outputs. Frozen release inputs follow [RELEASING.md](RELEASING.md); do not remove or replace them as part of cache cleanup. Project cleanup does not require clearing shared Gradle, package-manager or CocoaPods caches.
 
+After the work is complete and the build site is no longer needed, close its builds and preview local compiler cleanup:
+
+```sh
+python3 scripts/clean-build-output.py
+python3 scripts/clean-build-output.py --completed-plan <reviewed-plan-SHA256> --apply
+```
+
+The plan binds the current source and output inventory; changes require another preview. Cleanup is limited to known Gradle/Xcode compiler directories in the product's fixed build locations. It retains project inputs, installed dependencies, `SourcePackages`, frozen `dist/` files and `doc/dev/` records. Logs, reports and service/signing configuration copies inside output directories are verified in a private preservation archive and restored at their original paths. Unknown scratch directories and generated package copies require separate review. The command does not install, compile or publish, and is never run automatically before preparation. Consumer cleanup uses the integration repository's separate entry.
+
 ## Android builds and tests
 
 Use JDK 17 and Android SDK API 36. Set `JAVA_HOME` and `ANDROID_HOME`, or set `sdk.dir` in the ignored `native/android/local.properties`.
